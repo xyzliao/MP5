@@ -104,6 +104,8 @@ class MapCanvas(ttk.Frame):
             self.bounds = None
         self.current_pos_idx = 0
         self._redraw()
+        # 确保在widget渲染完成后重绘
+        self.after(100, self._redraw)
 
     def update_position(self, time_ms):
         """根据时间更新当前位置标记"""
@@ -326,23 +328,28 @@ class MP5PlayerApp:
         self.info_frame = ttk.LabelFrame(main, text='文件信息', padding=8)
         self.info_frame.pack(fill='x', pady=(0, 8))
 
-        # 5行3列网格布局
+        # 5行3列网格布局，列等宽
         self.info_labels = {}
         info_fields = [
             ('file',    '文件:'),     ('size',  '大小:'),     ('format', '格式:'),
             ('duration','时长:'),     ('tracks','轨道:'),     ('gps',    'GPS点:'),
             ('start',   '起点:'),     ('end',   '终点:'),     ('sync',   '同步:'),
-            ('poi',     'POI:'),     ('brand', '品牌:'),     ('stats',  '统计:'),
-            ('stat2',   ''),         ('stat3', ''),          ('stat4',  ''),
+            ('poi',     'POI:'),     ('brand', '品牌:'),     ('stats',  '距离:'),
+            ('stat2',   '最高速度:'), ('stat3', '平均速度:'), ('stat4',  '时长:'),
         ]
         for idx, (key, label_text) in enumerate(info_fields):
             row = idx // 3
             col = idx % 3
             lbl = ttk.Label(self.info_frame, text=label_text, foreground='#8b949e')
             val = ttk.Label(self.info_frame, text='--')
-            lbl.grid(row=row, column=col*2, sticky='w', padx=(0, 2))
-            val.grid(row=row, column=col*2+1, sticky='w', padx=(0, 12))
+            lbl.grid(row=row, column=col*2, sticky='w', padx=(0, 2), pady=1)
+            val.grid(row=row, column=col*2+1, sticky='w', padx=(0, 12), pady=1)
             self.info_labels[key] = val
+
+        # 让3列等宽分配
+        for i in range(3):
+            self.info_frame.columnconfigure(i*2, weight=0)
+            self.info_frame.columnconfigure(i*2+1, weight=1, uniform='info_col')
 
         # ---- 主内容区 ----
         content = ttk.Frame(main)
@@ -376,6 +383,7 @@ class MP5PlayerApp:
         # 地图面板
         self.map_frame = ttk.LabelFrame(content, text='地图', padding=4)
         self.map_canvas = MapCanvas(self.map_frame, on_click_callback=self.on_map_click)
+        self.map_canvas.pack(fill='both', expand=True)
 
         # 默认分屏布局
         self.current_view = '分屏'
