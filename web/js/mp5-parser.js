@@ -202,7 +202,11 @@ export class MP5Parser {
      */
     static stripMP5Boxes(buffer) {
         const boxes = parseBoxes(buffer);
-        const mp5BoxTypes = ['gloc', 'gmap', 'gsyn'];
+        const mp5BoxTypes = ['gloc', 'gmap', 'gsyn', 'gpoi'];
+
+        // 记录原始 mdat 数据偏移
+        const origMdat = findBox(boxes, 'mdat');
+        const origMdatDataOffset = origMdat ? origMdat.dataOffset : 0;
 
         // 收集需要移除的 box 的字节范围
         const rangesToRemove = [];
@@ -235,7 +239,64 @@ export class MP5Parser {
             result.set(chunk, writeOffset);
         }
 
-        return result.buffer;
+        const strippedBuffer = result.buffer;
+
+        // 修正 stco/co64 偏移量（mdat 位置前移了）
+        const newBoxes = parseBoxes(strippedBuffer);
+        const newMdat = findBox(newBoxes, 'mdat');
+        const newMdatDataOffset = newMdat ? newMdat.dataOffset : 0;
+        const delta = newMdatDataOffset - origMdatDataOffset;
+        if (delta !== 0) {
+            MP5Parser._fixStcoOffsets(strippedBuffer, delta);
+        }
+
+        return strippedBuffer;
+    }
+
+    /**
+     * 修正 moov 中 stco/co64 表的绝对偏移量
+     */
+    static _fixStcoOffsets(buffer, delta) {
+        if (delta === 0) return;
+
+        const boxes = parseBoxes(buffer);
+        const moov = findBox(boxes, 'moov');
+        if (!moov) return;
+
+        const stcoBoxes = [];
+        function findStcoBoxes(boxes) {
+            for (const box of boxes) {
+                if (box.type === 'stco' || box.type === 'co64') stcoBoxes.push(box);
+                if (box.children) findStcoBoxes(box.children);
+            }
+        }
+        findStcoBoxes(moov.children);
+
+        if (stcoBoxes.length === 0) return;
+
+        const view = new DataView(buffer);
+
+        for (const stco of stcoBoxes) {
+            const payloadStart = stco.offset + 12;
+            const entryCount = view.getUint32(payloadStart);
+
+            if (stco.type === 'stco') {
+                for (let i = 0; i < entryCount; i++) {
+                    const pos = payloadStart + 4 + i * 4;
+                    view.setUint32(pos, (view.getUint32(pos) + delta) >>> 0);
+                }
+            } else if (stco.type === 'co64') {
+                for (let i = 0; i < entryCount; i++) {
+                    const pos = payloadStart + 4 + i * 8;
+                    const hi = view.getUint32(pos);
+                    const lo = view.getUint32(pos + 4);
+                    const oldVal = hi * 0x100000000 + lo;
+                    const newVal = oldVal + delta;
+                    view.setUint32(pos, Math.floor(newVal / 0x100000000) >>> 0);
+                    view.setUint32(pos + 4, newVal & 0xFFFFFFFF);
+                }
+            }
+        }
     }
 
     /**

@@ -33,6 +33,9 @@ export class MP5Muxer {
         const moovBox = findBox(boxes, 'moov');
         const mdatBox = findBox(boxes, 'mdat');
 
+        // 记录原始 mdat 数据偏移
+        const origMdatDataOffset = mdatBox ? mdatBox.dataOffset : 0;
+
         // 构建 MP5 box
         const writer = new BinaryWriter();
 
@@ -72,11 +75,79 @@ export class MP5Muxer {
         if (mdatBox) {
             writer.writeBytes(new Uint8Array(mp4Buffer, mdatBox.offset, mdatBox.size));
         } else {
-            // 如果原始文件没有 mdat box（某些 MP4 变体），直接追加全部剩余数据
             writer.writeBytes(new Uint8Array(mp4Buffer));
         }
 
-        return new Blob([writer.getBuffer()], { type: 'video/mp5' });
+        const mp5Buffer = writer.getBuffer();
+
+        // 6. 修正 stco/co64 偏移量（mdat 位置后移了）
+        const newBoxes = parseBoxes(mp5Buffer);
+        const newMdat = findBox(newBoxes, 'mdat');
+        const newMdatDataOffset = newMdat ? newMdat.dataOffset : 0;
+        const delta = newMdatDataOffset - origMdatDataOffset;
+        if (delta !== 0) {
+            return new Blob([MP5Muxer._fixStcoOffsets(mp5Buffer, delta)], { type: 'video/mp5' });
+        }
+
+        return new Blob([mp5Buffer], { type: 'video/mp5' });
+    }
+
+    /**
+     * 修正 moov 中 stco/co64 表的绝对偏移量
+     * @param {ArrayBuffer} buffer - 完整文件数据
+     * @param {number} delta - 偏移修正量
+     * @returns {ArrayBuffer} 修正后的文件数据
+     */
+    static _fixStcoOffsets(buffer, delta) {
+        if (delta === 0) return buffer;
+
+        const boxes = parseBoxes(buffer);
+        const moov = findBox(boxes, 'moov');
+        if (!moov) return buffer;
+
+        // 查找所有 stco/co64 box
+        const stcoBoxes = [];
+        function findStcoBoxes(boxes) {
+            for (const box of boxes) {
+                if (box.type === 'stco' || box.type === 'co64') {
+                    stcoBoxes.push(box);
+                }
+                if (box.children) findStcoBoxes(box.children);
+            }
+        }
+        findStcoBoxes(moov.children);
+
+        if (stcoBoxes.length === 0) return buffer;
+
+        // 在 buffer 副本上修改
+        const data = new Uint8Array(buffer);
+        const view = new DataView(buffer);
+
+        for (const stco of stcoBoxes) {
+            // FullBox: 8 header + 4 version/flags = offset + 12
+            const payloadStart = stco.offset + 12;
+            const entryCount = view.getUint32(payloadStart);
+
+            if (stco.type === 'stco') {
+                for (let i = 0; i < entryCount; i++) {
+                    const pos = payloadStart + 4 + i * 4;
+                    const oldVal = view.getUint32(pos);
+                    view.setUint32(pos, (oldVal + delta) >>> 0);
+                }
+            } else if (stco.type === 'co64') {
+                for (let i = 0; i < entryCount; i++) {
+                    const pos = payloadStart + 4 + i * 8;
+                    const hi = view.getUint32(pos);
+                    const lo = view.getUint32(pos + 4);
+                    const oldVal = hi * 0x100000000 + lo;
+                    const newVal = oldVal + delta;
+                    view.setUint32(pos, Math.floor(newVal / 0x100000000) >>> 0);
+                    view.setUint32(pos + 4, newVal & 0xFFFFFFFF);
+                }
+            }
+        }
+
+        return buffer;
     }
 
     /**

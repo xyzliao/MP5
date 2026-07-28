@@ -376,12 +376,75 @@ def write_ftyp(major_brand: str = 'mp5v', minor_version: int = 0,
 # MP5 文件封装
 # ============================================================
 
+def _fix_stco_offsets(data: bytes, delta: int) -> bytes:
+    """
+    修正 moov 中 stco/co64 表的绝对偏移量
+    当 mdat 在文件中的位置发生变化时，stco 中的偏移需要加上 delta
+
+    @param data: 完整文件数据
+    @param delta: 偏移修正量（正数表示mdat后移，负数表示前移）
+    @return: 修正后的文件数据
+    """
+    if delta == 0:
+        return data
+
+    boxes = parse_boxes(data)
+    moov = find_box(boxes, 'moov')
+    if not moov:
+        return data
+
+    # 查找所有 stco 和 co64 box
+    def find_stco_boxes(boxes, results):
+        for box in boxes:
+            if box.type in ('stco', 'co64'):
+                results.append(box)
+            if box.children:
+                find_stco_boxes(box.children, results)
+
+    stco_boxes = []
+    find_stco_boxes(moov.children, stco_boxes)
+
+    if not stco_boxes:
+        return data
+
+    # 在data的副本上修改
+    data = bytearray(data)
+
+    for stco in stco_boxes:
+        # stco FullBox: 8-byte header + 4-byte version/flags + 4-byte entry_count + entries
+        # stco entry: uint32 absolute offset
+        # co64 entry: uint64 absolute offset
+
+        payload_start = stco.offset + 12  # 8 header + 4 version/flags
+        entry_count = struct.unpack_from('>I', data, payload_start)[0]
+
+        if stco.type == 'stco':
+            for i in range(entry_count):
+                offset_pos = payload_start + 4 + i * 4
+                old_val = struct.unpack_from('>I', data, offset_pos)[0]
+                new_val = old_val + delta
+                struct.pack_into('>I', data, offset_pos, new_val & 0xFFFFFFFF)
+        elif stco.type == 'co64':
+            for i in range(entry_count):
+                offset_pos = payload_start + 4 + i * 8
+                old_val = struct.unpack_from('>Q', data, offset_pos)[0]
+                new_val = old_val + delta
+                struct.pack_into('>Q', data, offset_pos, new_val)
+
+    return bytes(data)
+
+
 def mux_mp5(mp4_data: bytes, gps_entries: List[GPSEntry],
             sync_config: SyncConfig = None, pois: List[POI] = None) -> bytes:
     """
     将 MP4 数据 + GPS 数据封装为 MP5 文件
 
-    策略: 在原始 MP4 的 ftyp 之后、moov 之前或文件末尾追加 gloc/gsyn/gpoi box
+    策略:
+    1. 写入 MP5 ftyp (major_brand = mp5v)
+    2. 写入原始 moov box
+    3. 写入 gloc/gpoi/gsyn box (MP5扩展)
+    4. 写入 mdat box
+    5. 修正 moov 中 stco 的偏移量（因为 mdat 位置后移了）
     """
     if sync_config is None:
         sync_config = SyncConfig()
@@ -393,6 +456,9 @@ def mux_mp5(mp4_data: bytes, gps_entries: List[GPSEntry],
     ftyp_box = find_box(boxes, 'ftyp')
     moov_box = find_box(boxes, 'moov')
     mdat_box = find_box(boxes, 'mdat')
+
+    # 计算原始 mdat 的数据偏移
+    orig_mdat_data_offset = mdat_box.data_offset if mdat_box else 0
 
     result = io.BytesIO()
 
@@ -418,13 +484,28 @@ def mux_mp5(mp4_data: bytes, gps_entries: List[GPSEntry],
     if mdat_box:
         result.write(mp4_data[mdat_box.offset:mdat_box.offset + mdat_box.size])
     else:
-        # 如果没有 mdat，追加全部剩余数据
         result.write(mp4_data)
 
-    return result.getvalue()
+    mp5_data = result.getvalue()
+
+    # 7. 修正 stco 偏移量
+    # 计算新的 mdat 数据偏移
+    new_boxes = parse_boxes(mp5_data)
+    new_mdat = find_box(new_boxes, 'mdat')
+    new_mdat_data_offset = new_mdat.data_offset if new_mdat else 0
+
+    # delta = 新位置 - 旧位置
+    delta = new_mdat_data_offset - orig_mdat_data_offset
+    if delta != 0:
+        mp5_data = _fix_stco_offsets(mp5_data, delta)
+
+    return mp5_data
 
 def strip_mp5_boxes(data: bytes) -> bytes:
-    """去除 MP5 扩展 box (gloc/gsyn/gmap/gpoi)，返回纯 MP4 数据"""
+    """
+    去除 MP5 扩展 box (gloc/gsyn/gmap/gpoi)，返回纯 MP4 数据
+    同时修正 stco 偏移量（mdat 位置前移）
+    """
     boxes = parse_boxes(data)
     mp5_types = {'gloc', 'gmap', 'gsyn', 'gpoi'}
 
@@ -437,6 +518,13 @@ def strip_mp5_boxes(data: bytes) -> bytes:
     if not ranges:
         return data
 
+    # 计算原始 mdat 的数据偏移
+    mdat = find_box(boxes, 'mdat')
+    orig_mdat_offset = mdat.data_offset if mdat else 0
+
+    # 计算移除的总大小
+    total_removed = sum(end - start for start, end in ranges)
+
     # 构建新数据
     ranges.sort()
     result = io.BytesIO()
@@ -446,7 +534,16 @@ def strip_mp5_boxes(data: bytes) -> bytes:
         prev_end = end
     result.write(data[prev_end:])
 
-    return result.getvalue()
+    stripped_data = result.getvalue()
+
+    # 修正 stco 偏移量（mdat 前移了 total_removed 字节）
+    new_mdat = find_box(parse_boxes(stripped_data), 'mdat')
+    new_mdat_offset = new_mdat.data_offset if new_mdat else 0
+    delta = new_mdat_offset - orig_mdat_offset
+    if delta != 0:
+        stripped_data = _fix_stco_offsets(stripped_data, delta)
+
+    return stripped_data
 
 # ============================================================
 # 示例 MP5 文件生成
