@@ -326,8 +326,23 @@ class MP5PlayerApp:
         self.info_frame = ttk.LabelFrame(main, text='文件信息', padding=8)
         self.info_frame.pack(fill='x', pady=(0, 8))
 
-        self.info_label = ttk.Label(self.info_frame, text='请打开 MP5/MP4 文件')
-        self.info_label.pack(anchor='w')
+        # 5行3列网格布局
+        self.info_labels = {}
+        info_fields = [
+            ('file',    '文件:'),     ('size',  '大小:'),     ('format', '格式:'),
+            ('duration','时长:'),     ('tracks','轨道:'),     ('gps',    'GPS点:'),
+            ('start',   '起点:'),     ('end',   '终点:'),     ('sync',   '同步:'),
+            ('poi',     'POI:'),     ('brand', '品牌:'),     ('stats',  '统计:'),
+            ('stat2',   ''),         ('stat3', ''),          ('stat4',  ''),
+        ]
+        for idx, (key, label_text) in enumerate(info_fields):
+            row = idx // 3
+            col = idx % 3
+            lbl = ttk.Label(self.info_frame, text=label_text, foreground='#8b949e')
+            val = ttk.Label(self.info_frame, text='--')
+            lbl.grid(row=row, column=col*2, sticky='w', padx=(0, 2))
+            val.grid(row=row, column=col*2+1, sticky='w', padx=(0, 12))
+            self.info_labels[key] = val
 
         # ---- 主内容区 ----
         content = ttk.Frame(main)
@@ -462,8 +477,8 @@ class MP5PlayerApp:
             self.mp5_info = MP5Parser.parse(self.file_data)
 
             # 更新UI
-            self._update_info_display()
             self._load_track_data()
+            self._update_info_display()
 
             self.btn_play.config(state='normal')
             self.btn_stop.config(state='normal')
@@ -719,30 +734,46 @@ class MP5PlayerApp:
         ttk.Button(btn_frame, text='关闭', command=dialog.destroy).pack(side='left', padx=4)
 
     def _update_info_display(self):
-        """更新文件信息显示"""
+        """更新文件信息显示（5行3列网格）"""
         info = self.mp5_info
-        lines = []
+        L = self.info_labels
 
-        lines.append(f'文件: {os.path.basename(self.file_path)}')
-        lines.append(f'大小: {self._format_size(info.file_size)}')
-        lines.append(f'格式: {"MP5" if info.is_mp5 else "MP4"}')
-        lines.append(f'品牌: {info.major_brand} (兼容: {", ".join(info.compatible_brands)})')
-        lines.append(f'时长: {self._format_duration(info.duration_ms)}')
-        lines.append(f'轨道: {len(info.tracks)}')
-        for t in info.tracks:
-            dim = f' {t.width}x{t.height}' if t.width else ''
-            lines.append(f'  - #{t.track_id}: {t.track_type}{dim}')
-        lines.append(f'GPS采样点: {len(info.gps_entries)}')
-        lines.append(f'POI标记: {len(info.pois)}')
+        L['file'].config(text=os.path.basename(self.file_path))
+        L['size'].config(text=self._format_size(info.file_size))
+        L['format'].config(text='MP5' if info.is_mp5 else 'MP4')
+        L['brand'].config(text=f'{info.major_brand} ({", ".join(info.compatible_brands[:2])})')
+        L['duration'].config(text=self._format_duration(info.duration_ms))
+
+        track_strs = [f'#{t.track_id}:{t.track_type}' + (f' {t.width}x{t.height}' if t.width else '') for t in info.tracks]
+        L['tracks'].config(text=f'{len(info.tracks)}条 ' + ' '.join(track_strs[:2]))
+
+        L['gps'].config(text=str(len(info.gps_entries)))
+        L['poi'].config(text=str(len(info.pois)))
+
         if info.sync_config:
-            lines.append(f'同步模式: {info.sync_config.sync_mode}, 插值: {info.sync_config.interpolation}')
+            L['sync'].config(text=f'插值={info.sync_config.interpolation}')
+        else:
+            L['sync'].config(text='无')
+
         if info.gps_entries:
             first = info.gps_entries[0]
             last = info.gps_entries[-1]
-            lines.append(f'起点: {first.latitude:.6f}°, {first.longitude:.6f}°')
-            lines.append(f'终点: {last.latitude:.6f}°, {last.longitude:.6f}°')
+            L['start'].config(text=f'{first.latitude:.4f}°, {first.longitude:.4f}°')
+            L['end'].config(text=f'{last.latitude:.4f}°, {last.longitude:.4f}°')
+        else:
+            L['start'].config(text='无')
+            L['end'].config(text='无')
 
-        self.info_label.config(text='\n'.join(lines))
+        # 统计信息
+        if self.sync_engine:
+            stats = self.sync_engine.get_stats()
+            L['stats'].config(text=f'{stats["distance"]:.2f}km')
+            L['stat2'].config(text=f'最高:{stats["max_speed"]:.0f}km/h')
+            L['stat3'].config(text=f'均速:{stats["avg_speed"]:.0f}km/h')
+            L['stat4'].config(text=f'{stats["duration"]:.0f}s')
+        else:
+            for k in ('stats', 'stat2', 'stat3', 'stat4'):
+                L[k].config(text='--')
 
     def _load_track_data(self):
         """加载GPS轨迹数据到地图"""
