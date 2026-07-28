@@ -1,0 +1,15 @@
+# MP5录播器 Windows版 — 依赖
+
+# 核心依赖：无需额外安装，Python标准库即可运行
+# tkinter — GUI库（Python自带，Windows版Python默认包含）
+# struct — 二进制编解码（标准库）
+
+# 可选依赖（用于增强功能）:
+# python-vlc  # 内嵌视频播放（而非系统播放器）
+#   安装: pip install python-vlc
+#   需要同时安装 VLC 播放器: https://www.videolan.org/
+
+# 打包依赖（用于生成exe）:
+# pyinstaller  # 打包为Windows可执行文件
+#   安装: pip install pyinstaller
+#   打包: pyinstaller --onefile --windowed --name MP5Player mp5_player.py

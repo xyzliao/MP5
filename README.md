@@ -1,6 +1,6 @@
 # MP5 = MP4 + Map
 
-MP5录播器 — 轻量级MP5录制与播放Web应用
+MP5录播器 — 轻量级MP5录制与播放应用（Web版 + Windows版）
 
 ## 什么是MP5？
 
@@ -96,9 +96,19 @@ MP5/
 │       ├── player.js       # 播放模块
 │       ├── file-manager.js # 文件管理模块
 │       └── app.js          # 主应用入口
+├── windows/                # Windows桌面版
+│   ├── mp5_player.py       # 主程序入口 (tkinter GUI)
+│   ├── mp5_box.py          # MP5 Box编解码引擎
+│   ├── mp5_parser.py       # MP5文件解析器
+│   ├── sync_engine.py     # 视频↔地图同步引擎
+│   ├── exporters.py        # GPX/GeoJSON/KML导出
+│   ├── __init__.py         # 包初始化
+│   ├── build.bat           # Windows打包脚本
+│   └── requirements.txt    # 依赖说明
 ├── test/
-│   ├── mp5-format-test.js  # 格式单元测试
-│   └── sample.mp5          # 示例MP5文件
+│   ├── mp5-format-test.js  # Web版格式单元测试
+│   ├── mp5-integration-test.js # Web版集成测试
+│   └── test_mp5_windows.py # Windows版单元测试
 ├── MP5录播器设计文档.pdf    # 产品设计文档
 └── MP5格式设计规范.pdf      # 格式规范文档
 ```
@@ -120,6 +130,29 @@ npx serve web
 ```
 
 然后访问 http://localhost:8080
+
+### 运行Windows版
+
+```bash
+# 直接运行（需要 Python 3.8+ 和 tkinter）
+cd windows
+python mp5_player.py
+
+# 打包为exe（需要 PyInstaller）
+cd windows
+build.bat
+# 或手动: pyinstaller --onefile --windowed --name MP5Player mp5_player.py
+# 生成的 exe 位于 dist/MP5Player.exe
+```
+
+Windows版功能：
+- 打开MP5/MP4文件，自动解析GPS轨迹
+- GPS轨迹地图显示（Canvas绘制，速度热力图）
+- 视频↔地图双向联动（点击地图跳转视频）
+- 4种视图模式（仅视频/仅地图/分屏/画中画）
+- 导出GPX/GeoJSON/KML/MP4
+- 生成示例MP5文件（用于测试）
+- 轨迹统计（距离/速度/时长）
 
 ### 运行测试
 
