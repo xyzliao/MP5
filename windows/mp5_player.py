@@ -42,6 +42,8 @@ from mp5_box import (
 from mp5_parser import MP5Parser, MP5Info
 from sync_engine import SyncEngine
 from exporters import export_gpx, export_geojson, export_kml
+from gpx_importer import parse_gpx_file, get_video_duration
+from track_generator import generate_simulated_track
 
 # GUI 导入
 try:
@@ -279,7 +281,7 @@ class MP5PlayerApp:
         toolbar.pack(fill='x', pady=(0, 8))
 
         ttk.Button(toolbar, text='打开文件', command=self.open_file).pack(side='left', padx=4)
-        ttk.Button(toolbar, text='生成示例', command=self.generate_sample).pack(side='left', padx=4)
+        ttk.Button(toolbar, text='制作MP5', command=self.create_mp5_from_mp4).pack(side='left', padx=4)
         ttk.Separator(toolbar, orient='vertical').pack(side='left', fill='y', padx=8)
 
         self.btn_play = ttk.Button(toolbar, text='▶ 播放', command=self.toggle_play, state='disabled')
@@ -381,7 +383,7 @@ class MP5PlayerApp:
 
         file_menu = tk.Menu(menubar, tearoff=0)
         file_menu.add_command(label='打开MP5/MP4文件...', command=self.open_file, accelerator='Ctrl+O')
-        file_menu.add_command(label='生成示例MP5文件', command=self.generate_sample)
+        file_menu.add_command(label='从MP4制作MP5...', command=self.create_mp5_from_mp4)
         file_menu.add_separator()
         file_menu.add_command(label='导出GPX', command=self.export_gpx)
         file_menu.add_command(label='导出GeoJSON', command=self.export_geojson)
@@ -444,29 +446,247 @@ class MP5PlayerApp:
             messagebox.showerror('错误', f'加载文件失败:\n{e}')
             self.status_var.set('加载失败')
 
-    def generate_sample(self):
-        """生成示例MP5文件"""
-        self.status_var.set('正在生成示例MP5文件...')
-        self.root.update()
+    def create_mp5_from_mp4(self):
+        """从现有MP4文件制作MP5 — 选择MP4 + 导入GPS数据"""
 
-        try:
-            data = create_sample_mp5(60)
-            filepath = filedialog.asksaveasfilename(
-                title='保存示例MP5文件',
-                defaultextension='.mp5',
-                filetypes=[('MP5文件', '*.mp5')],
-                initialfile='sample.mp5'
+        dialog = tk.Toplevel(self.root)
+        dialog.title('从MP4制作MP5')
+        dialog.geometry('560x520')
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # 状态
+        state = {
+            'mp4_path': None,
+            'gpx_path': None,
+            'duration_ms': None,
+        }
+
+        # ---- MP4选择区 ----
+        mp4_frame = ttk.LabelFrame(dialog, text='第一步：选择MP4视频文件', padding=12)
+        mp4_frame.pack(fill='x', padx=12, pady=(12, 6))
+
+        mp4_path_var = tk.StringVar(value='未选择')
+        ttk.Label(mp4_frame, textvariable=mp4_path_var).pack(side='left', fill='x', expand=True)
+
+        def choose_mp4():
+            path = filedialog.askopenfilename(
+                title='选择MP4视频文件',
+                filetypes=[('视频文件', '*.mp4 *.mov *.avi *.mkv'), ('所有文件', '*.*')]
             )
-            if filepath:
-                with open(filepath, 'wb') as f:
-                    f.write(data)
-                self.status_var.set(f'示例文件已保存: {filepath} ({len(data)} bytes)')
-                messagebox.showinfo('成功', f'示例MP5文件已保存:\n{filepath}\n大小: {len(data)} bytes')
+            if not path:
+                return
+            state['mp4_path'] = path
+            mp4_path_var.set(os.path.basename(path))
+
+            # 获取视频时长
+            duration = get_video_duration(path)
+            if duration:
+                state['duration_ms'] = duration
+                dur_label.config(text=f'视频时长: {duration/1000:.1f}秒')
             else:
-                self.status_var.set('就绪')
-        except Exception as e:
-            messagebox.showerror('错误', f'生成失败:\n{e}')
-            self.status_var.set('生成失败')
+                dur_label.config(text='视频时长: 未知（无法运行ffprobe，将手动指定）')
+
+        ttk.Button(mp4_frame, text='浏览...', command=choose_mp4).pack(side='left', padx=(8, 0))
+        dur_label = ttk.Label(mp4_frame, text='视频时长: 未知')
+        dur_label.pack(anchor='w', pady=(4, 0))
+
+        # ---- GPS来源选择区 ----
+        gps_frame = ttk.LabelFrame(dialog, text='第二步：选择GPS数据来源', padding=12)
+        gps_frame.pack(fill='x', padx=12, pady=6)
+
+        gps_source = tk.StringVar(value='gpx')
+        ttk.Radiobutton(gps_frame, text='导入GPX文件', variable=gps_source, value='gpx',
+                       command=lambda: toggle_gps_source()).pack(anchor='w')
+        gpx_row = ttk.Frame(gps_frame)
+        gpx_row.pack(fill='x', padx=(24, 0), pady=2)
+        gpx_path_var = tk.StringVar(value='未选择')
+        ttk.Label(gpx_row, textvariable=gpx_path_var).pack(side='left', fill='x', expand=True)
+
+        def choose_gpx():
+            path = filedialog.askopenfilename(
+                title='选择GPX文件',
+                filetypes=[('GPX文件', '*.gpx'), ('所有文件', '*.*')]
+            )
+            if not path:
+                return
+            state['gpx_path'] = path
+            gpx_path_var.set(os.path.basename(path))
+
+        ttk.Button(gpx_row, text='浏览...', command=choose_gpx).pack(side='left', padx=(8, 0))
+
+        ttk.Radiobutton(gps_frame, text='生成模拟轨迹', variable=gps_source, value='simulate',
+                       command=lambda: toggle_gps_source()).pack(anchor='w', pady=(8, 0))
+
+        sim_frame = ttk.Frame(gps_frame)
+        sim_frame.pack(fill='x', padx=(24, 0), pady=4)
+
+        # 模拟轨迹参数
+        ttk.Label(sim_frame, text='起点纬度:').grid(row=0, column=0, sticky='w')
+        start_lat_var = tk.StringVar(value='39.9042')
+        ttk.Entry(sim_frame, textvariable=start_lat_var, width=12).grid(row=0, column=1, padx=4)
+
+        ttk.Label(sim_frame, text='起点经度:').grid(row=0, column=2, sticky='w')
+        start_lon_var = tk.StringVar(value='116.4074')
+        ttk.Entry(sim_frame, textvariable=start_lon_var, width=12).grid(row=0, column=3, padx=4)
+
+        ttk.Label(sim_frame, text='平均速度(km/h):').grid(row=1, column=0, sticky='w')
+        avg_speed_var = tk.StringVar(value='30')
+        ttk.Entry(sim_frame, textvariable=avg_speed_var, width=12).grid(row=1, column=1, padx=4)
+
+        ttk.Label(sim_frame, text='路线类型:').grid(row=1, column=2, sticky='w')
+        route_var = tk.StringVar(value='linear')
+        route_combo = ttk.Combobox(sim_frame, textvariable=route_var, width=10, state='readonly',
+                                   values=['linear', 'loop', 'winding'])
+        route_combo.grid(row=1, column=3, padx=4)
+
+        ttk.Label(sim_frame, text='采样率(Hz):').grid(row=2, column=0, sticky='w')
+        sample_rate_var = tk.StringVar(value='1')
+        ttk.Entry(sim_frame, textvariable=sample_rate_var, width=12).grid(row=2, column=1, padx=4)
+
+        def toggle_gps_source():
+            is_gpx = gps_source.get() == 'gpx'
+            for child in gpx_row.winfo_children():
+                child.configure(state='normal' if is_gpx else 'disabled')
+            for child in sim_frame.winfo_children():
+                try:
+                    child.configure(state='disabled' if is_gpx else 'normal')
+                except:
+                    pass
+
+        toggle_gps_source()
+
+        # ---- POI选项 ----
+        poi_frame = ttk.LabelFrame(dialog, text='POI标记（可选）', padding=12)
+        poi_frame.pack(fill='x', padx=12, pady=6)
+
+        ttk.Label(poi_frame, text='POI标签（逗号分隔，每5秒一个）:').pack(anchor='w')
+        poi_labels_var = tk.StringVar(value='')
+        ttk.Entry(poi_frame, textvariable=poi_labels_var, width=50).pack(fill='x', pady=4)
+
+        # ---- 进度显示 ----
+        progress_frame = ttk.LabelFrame(dialog, text='进度', padding=12)
+        progress_frame.pack(fill='x', padx=12, pady=6)
+
+        progress_var = tk.StringVar(value='准备就绪')
+        ttk.Label(progress_frame, textvariable=progress_var).pack(anchor='w')
+
+        # ---- 按钮 ----
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(fill='x', padx=12, pady=12)
+
+        def do_create():
+            if not state['mp4_path']:
+                messagebox.showwarning('提示', '请先选择MP4文件', parent=dialog)
+                return
+
+            # 获取视频时长
+            duration_ms = state['duration_ms']
+            if not duration_ms:
+                # 手动输入时长
+                result = simpledialog.askstring('视频时长', '无法自动获取视频时长，请手动输入（秒）:', parent=dialog)
+                if not result:
+                    return
+                try:
+                    duration_ms = float(result) * 1000
+                except ValueError:
+                    messagebox.showerror('错误', '时长输入无效', parent=dialog)
+                    return
+
+            progress_var.set('正在读取MP4文件...')
+            dialog.update()
+
+            try:
+                # 读取MP4
+                with open(state['mp4_path'], 'rb') as f:
+                    mp4_data = f.read()
+
+                # 获取GPS数据
+                if gps_source.get() == 'gpx':
+                    if not state['gpx_path']:
+                        messagebox.showwarning('提示', '请选择GPX文件', parent=dialog)
+                        return
+                    progress_var.set('正在解析GPX文件...')
+                    dialog.update()
+                    gps_entries = parse_gpx_file(state['gpx_path'], duration_ms)
+                    if not gps_entries:
+                        messagebox.showwarning('提示', 'GPX文件中没有找到轨迹点', parent=dialog)
+                        return
+                else:
+                    progress_var.set('正在生成模拟GPS轨迹...')
+                    dialog.update()
+                    gps_entries = generate_simulated_track(
+                        duration_ms=duration_ms,
+                        start_lat=float(start_lat_var.get()),
+                        start_lon=float(start_lon_var.get()),
+                        avg_speed=float(avg_speed_var.get()),
+                        route_type=route_var.get(),
+                        sample_rate=int(sample_rate_var.get()),
+                    )
+
+                progress_var.set(f'GPS点: {len(gps_entries)} 个，正在封装MP5...')
+                dialog.update()
+
+                # 生成POI
+                pois = []
+                labels = [l.strip() for l in poi_labels_var.get().split(',') if l.strip()]
+                for i, label in enumerate(labels):
+                    poi_time = (i + 1) * 5000  # 每5秒一个
+                    idx = int(poi_time / duration_ms * len(gps_entries))
+                    if 0 <= idx < len(gps_entries):
+                        e = gps_entries[idx]
+                        pois.append(POI(poi_time, e.latitude, e.longitude, label, 'poi'))
+
+                # 封装MP5
+                sync_config = SyncConfig(
+                    interpolation=1,
+                    default_view=2,
+                    show_trajectory=True,
+                    show_poi=True,
+                )
+                mp5_data = mux_mp5(mp4_data, gps_entries, sync_config, pois)
+
+                # 保存
+                default_name = os.path.splitext(os.path.basename(state['mp4_path']))[0] + '.mp5'
+                save_path = filedialog.asksaveasfilename(
+                    title='保存MP5文件',
+                    defaultextension='.mp5',
+                    filetypes=[('MP5文件', '*.mp5')],
+                    initialfile=default_name,
+                    parent=dialog,
+                )
+                if not save_path:
+                    return
+
+                with open(save_path, 'wb') as f:
+                    f.write(mp5_data)
+
+                progress_var.set(f'完成! MP5已保存: {os.path.basename(save_path)} ({len(mp5_data)} bytes)')
+
+                # 询问是否立即打开
+                if messagebox.askyesno('成功',
+                    f'MP5文件已保存:\n{save_path}\n\n'
+                    f'视频: {len(mp4_data)} bytes\n'
+                    f'GPS点: {len(gps_entries)}\n'
+                    f'POI: {len(pois)}\n'
+                    f'MP5总计: {len(mp5_data)} bytes\n\n'
+                    f'是否立即打开?',
+                    parent=dialog):
+                    dialog.destroy()
+                    self.file_path = save_path
+                    self.file_data = mp5_data
+                    self.mp5_info = MP5Parser.parse(mp5_data)
+                    self._update_info_display()
+                    self._load_track_data()
+                    self.btn_play.config(state='normal')
+                    self.btn_stop.config(state='normal')
+
+            except Exception as e:
+                progress_var.set(f'错误: {e}')
+                messagebox.showerror('错误', f'制作MP5失败:\n{e}', parent=dialog)
+
+        ttk.Button(btn_frame, text='制作MP5', command=do_create).pack(side='left', padx=4)
+        ttk.Button(btn_frame, text='关闭', command=dialog.destroy).pack(side='left', padx=4)
 
     def _update_info_display(self):
         """更新文件信息显示"""
