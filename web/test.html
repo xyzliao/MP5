@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MP5格式测试工具</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link rel="stylesheet" href="css/style.css"/>
+    <style>
+        body { overflow: auto; }
+        .test-container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .test-section { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+        .test-section h2 { color: #58a6ff; margin-bottom: 12px; font-size: 18px; }
+        .test-result { background: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 12px; margin-top: 8px; font-family: monospace; font-size: 13px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+        .test-btn { margin: 4px 0; }
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+        .stat-item { background: #0d1117; padding: 8px 12px; border-radius: 4px; border: 1px solid #30363d; }
+        .stat-label { color: #8b949e; font-size: 12px; }
+        .stat-value { color: #58a6ff; font-size: 16px; font-weight: 600; }
+        #test-map { width: 100%; height: 400px; border-radius: 8px; margin-top: 12px; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1 style="color: #58a6ff; margin-bottom: 20px;">MP5格式测试工具</h1>
+
+        <div class="test-section">
+            <h2>1. 生成示例MP5文件</h2>
+            <p style="color: #8b949e; margin-bottom: 8px;">生成一个包含模拟GPS轨迹的示例MP5文件，用于测试解析和播放功能</p>
+            <label>模拟时长（秒）: <input type="number" id="sample-duration" value="60" min="10" max="600" style="background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:4px;padding:4px 8px;"></label>
+            <button class="btn btn-primary test-btn" id="btn-generate-sample">生成示例MP5</button>
+            <button class="btn test-btn" id="btn-download-sample">下载示例MP5文件</button>
+            <div class="test-result" id="generate-result">点击按钮生成示例文件</div>
+        </div>
+
+        <div class="test-section">
+            <h2>2. 解析MP5文件</h2>
+            <p style="color: #8b949e; margin-bottom: 8px;">选择MP5/MP4文件，解析并显示Box结构和GPS轨迹</p>
+            <input type="file" id="parse-file-input" accept=".mp5,.mp4" style="color: #e6edf3;"/>
+            <button class="btn btn-primary test-btn" id="btn-parse">解析文件</button>
+            <div class="test-result" id="parse-result">选择文件后点击解析</div>
+        </div>
+
+        <div class="test-section">
+            <h2>3. GPS轨迹统计</h2>
+            <div class="stat-grid" id="stats-grid">
+                <div class="stat-item"><div class="stat-label">GPS采样点数</div><div class="stat-value" id="stat-count">--</div></div>
+                <div class="stat-item"><div class="stat-label">总距离</div><div class="stat-value" id="stat-distance">--</div></div>
+                <div class="stat-item"><div class="stat-label">最高速度</div><div class="stat-value" id="stat-maxspeed">--</div></div>
+                <div class="stat-item"><div class="stat-label">平均速度</div><div class="stat-value" id="stat-avgspeed">--</div></div>
+                <div class="stat-item"><div class="stat-label">时长</div><div class="stat-value" id="stat-duration">--</div></div>
+                <div class="stat-item"><div class="stat-label">文件大小</div><div class="stat-value" id="stat-size">--</div></div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>4. 轨迹地图预览</h2>
+            <div id="test-map"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>5. 导出测试</h2>
+            <button class="btn btn-primary test-btn" id="btn-export-gpx">导出GPX</button>
+            <button class="btn btn-primary test-btn" id="btn-export-geojson">导出GeoJSON</button>
+            <button class="btn btn-primary test-btn" id="btn-export-mp4">导出MP4（去除GPS）</button>
+            <div class="test-result" id="export-result">加载文件后可导出</div>
+        </div>
+
+        <div class="test-section">
+            <h2>6. Box结构可视化</h2>
+            <div class="test-result" id="box-tree">加载文件后显示Box结构</div>
+        </div>
+
+        <p style="text-align: center; margin-top: 20px;">
+            <a href="index.html" style="color: #58a6ff;">← 返回主应用</a>
+        </p>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module">
+        import { MP5Muxer } from './js/mp5-muxer.js';
+        import { MP5Parser } from './js/mp5-parser.js';
+        import { parseBoxes, findBox, parseGlocBox, parseGsynBox } from './js/mp5-box.js';
+        import { SyncEngine } from './js/sync-engine.js';
+
+        let currentBuffer = null;
+        let currentParsed = null;
+        let testMap = null;
+        let testTrackLayer = null;
+        let testHeatmapLayer = null;
+
+        // 初始化测试地图
+        function initTestMap() {
+            testMap = L.map('test-map', { center: [39.9912, 116.3974], zoom: 14 });
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(testMap);
+            testTrackLayer = L.layerGroup().addTo(testMap);
+            testHeatmapLayer = L.layerGroup().addTo(testMap);
+        }
+        initTestMap();
+
+        // 1. 生成示例MP5
+        let sampleBlob = null;
+        document.getElementById('btn-generate-sample').addEventListener('click', async () => {
+            const duration = parseInt(document.getElementById('sample-duration').value);
+            const resultEl = document.getElementById('generate-result');
+            resultEl.textContent = '正在生成示例MP5文件...';
+
+            try {
+                sampleBlob = await MP5Muxer.createSampleMP5(duration);
+                const buffer = await sampleBlob.arrayBuffer();
+                currentBuffer = buffer;
+                currentParsed = MP5Parser.parse(buffer);
+
+                resultEl.textContent = `生成成功!\n文件大小: ${sampleBlob.size} bytes\nGPS采样点: ${currentParsed.gpsEntries.length}\n是否MP5: ${currentParsed.isMP5}\nftyp品牌: ${currentParsed.ftyp?.majorBrand}\n兼容品牌: ${currentParsed.ftyp?.compatibleBrands?.join(', ')}`;
+
+                updateStats(currentParsed);
+                renderTrackOnMap(currentParsed.gpsEntries);
+                renderBoxTree(currentBuffer);
+            } catch (err) {
+                resultEl.textContent = `生成失败: ${err.message}\n${err.stack}`;
+            }
+        });
+
+        document.getElementById('btn-download-sample').addEventListener('click', () => {
+            if (!sampleBlob) {
+                alert('请先生成示例文件');
+                return;
+            }
+            const url = URL.createObjectURL(sampleBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sample.mp5';
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        });
+
+        // 2. 解析文件
+        document.getElementById('btn-parse').addEventListener('click', async () => {
+            const fileInput = document.getElementById('parse-file-input');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('请选择文件');
+                return;
+            }
+
+            const resultEl = document.getElementById('parse-result');
+            resultEl.textContent = `正在解析 ${file.name}...`;
+
+            try {
+                const buffer = await file.arrayBuffer();
+                currentBuffer = buffer;
+                currentParsed = MP5Parser.parse(buffer);
+
+                const lines = [];
+                lines.push(`文件名: ${file.name}`);
+                lines.push(`文件大小: ${file.size} bytes (${(file.size/1024).toFixed(1)} KB)`);
+                lines.push(`是否MP5: ${currentParsed.isMP5}`);
+                lines.push(`ftyp品牌: ${currentParsed.ftyp?.majorBrand || 'N/A'}`);
+                lines.push(`兼容品牌: ${currentParsed.ftyp?.compatibleBrands?.join(', ') || 'N/A'}`);
+                lines.push(`轨道数: ${currentParsed.tracks.length}`);
+                for (const track of currentParsed.tracks) {
+                    lines.push(`  - 轨道 #${track.id}: ${track.type} ${track.width}x${track.height || ''}`);
+                }
+                lines.push(`GPS采样点: ${currentParsed.gpsEntries.length}`);
+                lines.push(`同步规则: ${JSON.stringify(currentParsed.syncConfig)}`);
+                lines.push(`地图数据: ${currentParsed.mapData ? '有' : '无'}`);
+                lines.push(`时长: ${currentParsed.durationMs || 0} ms`);
+
+                if (currentParsed.gpsEntries.length > 0) {
+                    const first = currentParsed.gpsEntries[0];
+                    const last = currentParsed.gpsEntries[currentParsed.gpsEntries.length - 1];
+                    lines.push(`\n首个GPS点: lat=${first.latitude.toFixed(7)}, lon=${first.longitude.toFixed(7)}, alt=${first.altitude}m, speed=${first.speed}km/h`);
+                    lines.push(`末尾GPS点: lat=${last.latitude.toFixed(7)}, lon=${last.longitude.toFixed(7)}, alt=${last.altitude}m, speed=${last.speed}km/h`);
+                }
+
+                resultEl.textContent = lines.join('\n');
+
+                updateStats(currentParsed);
+                renderTrackOnMap(currentParsed.gpsEntries);
+                renderBoxTree(currentBuffer);
+            } catch (err) {
+                resultEl.textContent = `解析失败: ${err.message}\n${err.stack}`;
+            }
+        });
+
+        // 3. 更新统计
+        function updateStats(parsed) {
+            const entries = parsed.gpsEntries || [];
+            document.getElementById('stat-count').textContent = entries.length;
+
+            if (entries.length === 0) {
+                document.getElementById('stat-distance').textContent = '--';
+                document.getElementById('stat-maxspeed').textContent = '--';
+                document.getElementById('stat-avgspeed').textContent = '--';
+                document.getElementById('stat-duration').textContent = '--';
+                return;
+            }
+
+            let dist = 0, maxSpeed = 0, totalSpeed = 0;
+            for (let i = 0; i < entries.length; i++) {
+                maxSpeed = Math.max(maxSpeed, entries[i].speed);
+                totalSpeed += entries[i].speed;
+                if (i > 0) {
+                    const R = 6371000;
+                    const dLat = (entries[i].latitude - entries[i-1].latitude) * Math.PI / 180;
+                    const dLon = (entries[i].longitude - entries[i-1].longitude) * Math.PI / 180;
+                    const a = Math.sin(dLat/2)**2 + Math.cos(entries[i-1].latitude * Math.PI/180) * Math.cos(entries[i].latitude * Math.PI/180) * Math.sin(dLon/2)**2;
+                    dist += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                }
+            }
+
+            const duration = entries.length > 1 ? (entries[entries.length-1].timestamp - entries[0].timestamp) / 1000 : 0;
+
+            document.getElementById('stat-distance').textContent = (dist/1000).toFixed(2) + ' km';
+            document.getElementById('stat-maxspeed').textContent = maxSpeed.toFixed(1) + ' km/h';
+            document.getElementById('stat-avgspeed').textContent = (totalSpeed/entries.length).toFixed(1) + ' km/h';
+            document.getElementById('stat-duration').textContent = duration.toFixed(0) + ' s';
+            document.getElementById('stat-size').textContent = (currentBuffer.byteLength / 1024).toFixed(1) + ' KB';
+        }
+
+        // 4. 在地图上渲染轨迹
+        function renderTrackOnMap(entries) {
+            testTrackLayer.clearLayers();
+            testHeatmapLayer.clearLayers();
+
+            if (!entries || entries.length === 0) return;
+
+            const latlngs = entries.map(e => [e.latitude, e.longitude]);
+
+            // 完整轨迹
+            L.polyline(latlngs, { color: '#58a6ff', weight: 3, opacity: 0.6 }).addTo(testTrackLayer);
+
+            // 速度热力图
+            for (let i = 1; i < entries.length; i++) {
+                const color = SyncEngine.getSpeedColor(entries[i].speed);
+                L.polyline(
+                    [[entries[i-1].latitude, entries[i-1].longitude], [entries[i].latitude, entries[i].longitude]],
+                    { color, weight: 5, opacity: 0.7 }
+                ).addTo(testHeatmapLayer);
+            }
+
+            // 起点终点
+            L.marker(latlngs[0], { icon: L.divIcon({ html: '🟢', iconSize: [24,24] }) }).addTo(testTrackLayer);
+            L.marker(latlngs[latlngs.length-1], { icon: L.divIcon({ html: '🔴', iconSize: [24,24] }) }).addTo(testTrackLayer);
+
+            // 当前位置
+            L.circleMarker(latlngs[0], { radius: 8, fillColor: '#f85149', fillOpacity: 1, color: '#fff', weight: 2 }).addTo(testTrackLayer);
+
+            testMap.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40] });
+        }
+
+        // 5. 导出
+        document.getElementById('btn-export-gpx').addEventListener('click', () => {
+            if (!currentParsed) { alert('请先加载文件'); return; }
+            const gpx = MP5Parser.toGPX(currentParsed);
+            downloadText(gpx, 'track.gpx', 'application/gpx+xml');
+            document.getElementById('export-result').textContent = 'GPX导出成功';
+        });
+
+        document.getElementById('btn-export-geojson').addEventListener('click', () => {
+            if (!currentParsed) { alert('请先加载文件'); return; }
+            const geojson = MP5Parser.toGeoJSON(currentParsed);
+            downloadText(JSON.stringify(geojson, null, 2), 'track.geojson', 'application/geo+json');
+            document.getElementById('export-result').textContent = 'GeoJSON导出成功';
+        });
+
+        document.getElementById('btn-export-mp4').addEventListener('click', () => {
+            if (!currentBuffer) { alert('请先加载文件'); return; }
+            const mp4Buffer = MP5Parser.stripMP5Boxes(currentBuffer);
+            const blob = new Blob([mp4Buffer], { type: 'video/mp4' });
+            downloadBlob(blob, 'video.mp4');
+            document.getElementById('export-result').textContent = `MP4导出成功 (原: ${currentBuffer.byteLength} bytes → MP4: ${mp4Buffer.byteLength} bytes)`;
+        });
+
+        function downloadText(text, filename, type) {
+            const blob = new Blob([text], { type });
+            downloadBlob(blob, filename);
+        }
+
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        // 6. Box结构可视化
+        function renderBoxTree(buffer) {
+            const boxes = parseBoxes(buffer);
+            const lines = [];
+
+            function formatBox(box, indent) {
+                const pad = '  '.repeat(indent);
+                let line = `${pad}├── ${box.type} (size=${box.size}`;
+                if (box.version !== undefined) line += `, v${box.version}`;
+                line += ')';
+
+                if (box.type === 'gloc') {
+                    const entries = parseGlocBox(box);
+                    line += ` → ${entries.length} GPS entries`;
+                } else if (box.type === 'gsyn') {
+                    const config = parseGsynBox(box);
+                    line += ` → interpolation=${config.interpolation}, view=${config.defaultView}`;
+                } else if (box.type === 'ftyp') {
+                    // 读取品牌信息
+                    const view = new DataView(box.buffer, box.dataOffset);
+                    let brand = '';
+                    for (let i = 0; i < 4; i++) brand += String.fromCharCode(view.getUint8(i));
+                    line += ` → brand=${brand}`;
+                }
+
+                lines.push(line);
+                if (box.children) {
+                    for (const child of box.children) {
+                        formatBox(child, indent + 1);
+                    }
+                }
+            }
+
+            for (const box of boxes) {
+                formatBox(box, 0);
+            }
+
+            document.getElementById('box-tree').textContent = lines.join('\n');
+        }
+    </script>
+</body>
+</html>
