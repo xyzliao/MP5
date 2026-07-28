@@ -5,19 +5,21 @@ MP5录播器 — Windows版桌面播放器
 
 功能:
   - 打开 MP5/MP4 文件
-  - 视频播放（调用系统播放器或内嵌播放）
+  - 视频播放（VLC内嵌播放 或 系统播放器回退）
   - GPS轨迹地图显示（Canvas绘制）
   - 视频↔地图双向联动
   - 速度热力图
   - POI标记显示
   - 导出 GPX / GeoJSON / KML / MP4
   - 轨迹统计信息
+  - 从MP4制作MP5（导入GPX或生成模拟轨迹）
 
 运行方式:
   python mp5_player.py
 
-在 Windows 上可直接运行，无需额外安装依赖。
-视频播放使用系统默认播放器打开（如果需要内嵌播放，需安装 python-vlc）。
+视频播放:
+  - 优先使用 python-vlc 内嵌播放（需安装 pip install python-vlc 和 VLC播放器）
+  - 未安装 python-vlc 时自动回退到系统默认播放器
 
 作者: MP5录播器
 """
@@ -44,6 +46,13 @@ from sync_engine import SyncEngine
 from exporters import export_gpx, export_geojson, export_kml
 from gpx_importer import parse_gpx_file, get_video_duration
 from track_generator import generate_simulated_track
+
+# 尝试导入 python-vlc (内嵌视频播放)
+try:
+    import vlc
+    HAS_VLC = True
+except ImportError:
+    HAS_VLC = False
 
 # GUI 导入
 try:
@@ -260,6 +269,11 @@ class MP5PlayerApp:
         # 临时文件（用于视频播放）
         self.temp_video_file = None
 
+        # VLC 播放器
+        self.vlc_instance = None
+        self.vlc_player = None
+        self.vlc_widget = None  # VLC视频输出嵌入的widget
+
         self._setup_ui()
         self._setup_menu()
 
@@ -321,12 +335,28 @@ class MP5PlayerApp:
 
         # 视频面板
         self.video_frame = ttk.LabelFrame(content, text='视频', padding=4)
-        self.video_text = tk.Text(self.video_frame, bg='#000000', fg='#8b949e',
-                                  height=20, wrap='word', state='disabled',
-                                  font=('Consolas', 10))
-        self.video_text.pack(fill='both', expand=True)
-        self._set_video_text('视频区域\n\n打开MP5文件后，点击"播放"将使用系统播放器播放视频\n\n'
-                            '如需内嵌播放，请安装 python-vlc:\n  pip install python-vlc')
+
+        if HAS_VLC:
+            # VLC内嵌播放 — 用一个Frame作为VLC的视频输出目标
+            self.vlc_widget = tk.Frame(self.video_frame, bg='#000000')
+            self.vlc_widget.pack(fill='both', expand=True)
+
+            # 初始化VLC
+            self.vlc_instance = vlc.Instance('--no-xlib --quiet')
+            self.vlc_player = self.vlc_instance.media_player_new()
+
+            # 在Windows上用HWND，Linux上用XID，macOS用NSView
+            # 需要等widget渲染后获取window handle
+            self.vlc_widget.bind('<Configure>', self._on_vlc_widget_configure)
+        else:
+            # 无VLC — 显示提示文本
+            self.video_text = tk.Text(self.video_frame, bg='#000000', fg='#8b949e',
+                                      height=20, wrap='word', state='disabled',
+                                      font=('Consolas', 10))
+            self.video_text.pack(fill='both', expand=True)
+            self._set_video_text('视频区域\n\n未检测到 python-vlc，点击"播放"将使用系统播放器\n\n'
+                                '安装内嵌播放支持:\n  pip install python-vlc\n\n'
+                                '同时需要安装 VLC 播放器: https://www.videolan.org/')
 
         # 地图面板
         self.map_frame = ttk.LabelFrame(content, text='地图', padding=4)
@@ -754,6 +784,22 @@ class MP5PlayerApp:
         else:
             self.start_play()
 
+    def _on_vlc_widget_configure(self, event):
+        """VLC视频widget尺寸变化时，重新绑定window handle"""
+        if not self.vlc_player or not self.vlc_widget:
+            return
+        # 获取平台相关的window handle
+        try:
+            hdl = self.vlc_widget.winfo_id()
+            if sys.platform == 'win32':
+                self.vlc_player.set_hwnd(hdl)
+            elif sys.platform == 'darwin':
+                self.vlc_player.set_nsobject(hdl)
+            else:
+                self.vlc_player.set_xwindow(hdl)
+        except Exception as e:
+            print(f'VLC绑定窗口失败: {e}')
+
     def start_play(self):
         """开始播放"""
         if not self.file_data:
@@ -775,16 +821,43 @@ class MP5PlayerApp:
             with open(self.temp_video_file.name, 'wb') as f:
                 f.write(mp4_data)
 
-        # 使用系统默认播放器打开视频
-        self._open_system_player()
+        if HAS_VLC and self.vlc_player:
+            # 使用VLC内嵌播放
+            self._start_vlc_playback()
+        else:
+            # 回退到系统播放器
+            self._open_system_player()
 
-        # 启动播放时间模拟线程
+        # 启动播放时间同步线程
         self.playback_start = time.time() - (self.playback_time / 1000.0)
         self.playback_thread = threading.Thread(target=self._playback_loop, daemon=True)
         self.playback_thread.start()
 
+    def _start_vlc_playback(self):
+        """使用VLC内嵌播放视频"""
+        if not self.temp_video_file or not self.vlc_player:
+            return
+
+        video_path = self.temp_video_file.name
+
+        # 创建媒体并设置给播放器
+        media = self.vlc_instance.media_new(video_path)
+        self.vlc_player.set_media(media)
+
+        # 绑定视频输出到widget
+        self._on_vlc_widget_configure(None)
+
+        # 如果有当前播放位置，跳转
+        if self.playback_time > 0:
+            duration = self._get_duration_ms()
+            if duration > 0:
+                self.vlc_player.set_position(min(0.999, self.playback_time / duration))
+
+        # 播放
+        self.vlc_player.play()
+
     def _open_system_player(self):
-        """使用系统默认播放器打开视频"""
+        """使用系统默认播放器打开视频（VLC不可用时的回退方案）"""
         if not self.temp_video_file:
             return
 
@@ -802,12 +875,18 @@ class MP5PlayerApp:
 
     def _playback_loop(self):
         """播放时间更新循环"""
-        duration = self.mp5_info.duration_ms if self.mp5_info else 0
-        if duration == 0 and self.mp5_info and self.mp5_info.gps_entries:
-            duration = self.mp5_info.gps_entries[-1].timestamp
+        duration = self._get_duration_ms()
 
         while not self.playback_stop.is_set() and self.is_playing:
-            self.playback_time = (time.time() - self.playback_start) * 1000
+            if HAS_VLC and self.vlc_player:
+                # 从VLC读取真实播放时间
+                vlc_time = self.vlc_player.get_time()
+                if vlc_time >= 0:
+                    self.playback_time = vlc_time
+                else:
+                    self.playback_time = (time.time() - self.playback_start) * 1000
+            else:
+                self.playback_time = (time.time() - self.playback_start) * 1000
 
             if duration > 0 and self.playback_time >= duration:
                 self.playback_time = duration
@@ -820,9 +899,7 @@ class MP5PlayerApp:
 
     def _update_playback_ui(self):
         """更新播放UI"""
-        duration = self.mp5_info.duration_ms if self.mp5_info else 0
-        if duration == 0 and self.mp5_info and self.mp5_info.gps_entries:
-            duration = self.mp5_info.gps_entries[-1].timestamp
+        duration = self._get_duration_ms()
 
         self.progress_var.set(self.playback_time)
         self.time_label.config(text=f'{self._format_duration(self.playback_time)} / {self._format_duration(duration)}')
@@ -837,11 +914,21 @@ class MP5PlayerApp:
         self.btn_play.config(text='▶ 播放')
         self.status_var.set('播放结束')
 
+    def _get_duration_ms(self):
+        """获取视频时长（毫秒）"""
+        duration = self.mp5_info.duration_ms if self.mp5_info else 0
+        if duration == 0 and self.mp5_info and self.mp5_info.gps_entries:
+            duration = self.mp5_info.gps_entries[-1].timestamp
+        return duration
+
     def pause_play(self):
         """暂停播放"""
         self.is_playing = False
         self.btn_play.config(text='▶ 播放')
         self.playback_stop.set()
+
+        if HAS_VLC and self.vlc_player:
+            self.vlc_player.set_pause(1)
 
     def stop_play(self):
         """停止播放"""
@@ -854,15 +941,21 @@ class MP5PlayerApp:
         if self.map_canvas:
             self.map_canvas.update_position(0)
 
+        if HAS_VLC and self.vlc_player:
+            self.vlc_player.stop()
+
     def on_progress_change(self, value):
         """进度条拖动"""
         self.playback_time = float(value)
         if self.is_playing:
             self.playback_start = time.time() - (self.playback_time / 1000.0)
 
-        duration = self.mp5_info.duration_ms if self.mp5_info else 0
-        if duration == 0 and self.mp5_info and self.mp5_info.gps_entries:
-            duration = self.mp5_info.gps_entries[-1].timestamp
+        duration = self._get_duration_ms()
+
+        # VLC跳转
+        if HAS_VLC and self.vlc_player and duration > 0:
+            pos = min(0.999, self.playback_time / duration)
+            self.vlc_player.set_position(pos)
 
         self.time_label.config(text=f'{self._format_duration(self.playback_time)} / {self._format_duration(duration)}')
 
@@ -876,7 +969,13 @@ class MP5PlayerApp:
         if self.is_playing:
             self.playback_start = time.time() - (timestamp_ms / 1000.0)
 
-        duration = self.mp5_info.duration_ms if self.mp5_info else 0
+        duration = self._get_duration_ms()
+
+        # VLC跳转
+        if HAS_VLC and self.vlc_player and duration > 0:
+            pos = min(0.999, timestamp_ms / duration)
+            self.vlc_player.set_position(pos)
+
         self.time_label.config(text=f'{self._format_duration(timestamp_ms)} / {self._format_duration(duration)}')
         self.status_var.set(f'跳转到: {self._format_duration(timestamp_ms)}')
 
@@ -1030,8 +1129,13 @@ MP5 = MP4 + Map
         messagebox.showinfo('关于', about_text)
 
     def cleanup(self):
-        """清理临时文件"""
+        """清理临时文件和VLC"""
         self.playback_stop.set()
+        if HAS_VLC and self.vlc_player:
+            try:
+                self.vlc_player.stop()
+            except:
+                pass
         if self.temp_video_file:
             try:
                 os.unlink(self.temp_video_file.name)
