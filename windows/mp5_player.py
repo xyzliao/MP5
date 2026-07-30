@@ -452,7 +452,12 @@ class MP5PlayerApp:
     def _set_split_equal(self):
         """将 PanedWindow 分隔条设置到正中（50/50平分）"""
         try:
-            self.paned.sashpos(0, self.paned.winfo_width() // 2)
+            w = self.paned.winfo_width()
+            if w > 10:
+                self.paned.sashpos(0, w // 2)
+            else:
+                # 窗口还未渲染完成，稍后重试
+                self.root.after(100, self._set_split_equal)
         except Exception:
             pass
 
@@ -988,10 +993,24 @@ class MP5PlayerApp:
             self.map_canvas.update_position(self.playback_time)
 
     def _on_playback_finished(self):
-        """播放结束"""
+        """播放结束 — 恢复到等待播放状态"""
         self.is_playing = False
+        self.playback_stop.set()
+        self.playback_time = 0  # 归零，下次播放从头开始
         self.btn_play.config(text='▶ 播放')
-        self.status_var.set('播放结束')
+        # 停止VLC播放器
+        if HAS_VLC and self.vlc_player:
+            try:
+                self.vlc_player.stop()
+            except Exception:
+                pass
+        # 进度条和时间显示归零
+        self.progress_var.set(0)
+        self.time_label.config(text='00:00 / 00:00')
+        # 地图位置也回到起点
+        if self.map_canvas:
+            self.map_canvas.update_position(0)
+        self.status_var.set('播放结束 — 点击"播放"可重新播放')
 
     def _get_duration_ms(self):
         """获取视频时长（毫秒）"""
