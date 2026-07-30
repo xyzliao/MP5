@@ -963,16 +963,25 @@ class MP5PlayerApp:
 
         while not self.playback_stop.is_set() and self.is_playing:
             if HAS_VLC and self.vlc_player:
+                # 检查VLC播放状态 — 播放结束/停止时直接触发完成
+                state = self.vlc_player.get_state()
+                # vlc.State.Ended=6, vlc.State.Stopped=5
+                if state in (6, 5):
+                    self.root.after(0, self._on_playback_finished)
+                    break
+
                 # 从VLC读取真实播放时间
                 vlc_time = self.vlc_player.get_time()
                 if vlc_time >= 0:
                     self.playback_time = vlc_time
                 else:
+                    # VLC尚未就绪或刚结束，用墙钟估算
                     self.playback_time = (time.time() - self.playback_start) * 1000
             else:
                 self.playback_time = (time.time() - self.playback_start) * 1000
 
-            if duration > 0 and self.playback_time >= duration:
+            # 容差200ms，避免因精度差异永远差一点不到duration
+            if duration > 0 and self.playback_time >= duration - 200:
                 self.playback_time = duration
                 self.root.after(0, self._on_playback_finished)
                 break
