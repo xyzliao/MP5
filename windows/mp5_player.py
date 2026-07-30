@@ -499,6 +499,20 @@ class MP5PlayerApp:
         if not filepath:
             return
 
+        # 先停止当前播放并重置播放/进度条到初始状态
+        self.stop_play()
+        self.btn_play.config(state='disabled')
+        self.btn_stop.config(state='disabled')
+        self.progress_var.set(0)
+        self.time_label.config(text='00:00 / 00:00')
+        # 清除旧的临时视频文件，下次播放时重新生成
+        if self.temp_video_file:
+            try:
+                os.unlink(self.temp_video_file.name)
+            except Exception:
+                pass
+            self.temp_video_file = None
+
         self.status_var.set(f'正在加载 {filepath}...')
         self.root.update()
 
