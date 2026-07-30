@@ -120,17 +120,80 @@ export class Player {
                 break;
             case 'pip':
                 main.classList.add('view-pip');
+                this._setupPipDrag(main);
                 break;
         }
 
         // 通知地图更新尺寸
         if (this.mapManager) {
-            setTimeout(() => this.mapManager.invalidateSize(), 100);
+            // 多次延迟调用，确保绝对定位容器完成渲染后地图能正确刷新
+            setTimeout(() => this.mapManager.invalidateSize(), 50);
+            setTimeout(() => this.mapManager.invalidateSize(), 200);
         }
 
         // 更新按钮状态
         document.querySelectorAll('.btn-view').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.view === view);
+        });
+    }
+
+    /**
+     * 设置画中画小窗口的可拖拽功能
+     * @param {HTMLElement} main - player-main 容器
+     */
+    _setupPipDrag(main) {
+        const mapPane = document.getElementById('map-pane');
+        if (!mapPane || mapPane._pipDragSetup) return;
+        mapPane._pipDragSetup = true;
+
+        let dragging = false;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        // 用一个小拖拽手柄覆盖在地图右上角
+        const handle = document.createElement('div');
+        handle.style.cssText = 'position:absolute;top:0;right:0;width:20px;height:20px;' +
+            'cursor:move;z-index:1000;background:rgba(48,54,61,0.8);border-radius:0 6px 0 6px;' +
+            'display:flex;align-items:center;justify-content:center;font-size:10px;color:#8b949e;';
+        handle.textContent = '⠿';
+        handle.title = '拖拽移动地图小窗';
+        mapPane.appendChild(handle);
+
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dragging = true;
+            const rect = mapPane.getBoundingClientRect();
+            const mainRect = main.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+            // 切换为 left/top 定位
+            const left = rect.left - mainRect.left;
+            const top = rect.top - mainRect.top;
+            mapPane.style.right = 'auto';
+            mapPane.style.bottom = 'auto';
+            mapPane.style.left = left + 'px';
+            mapPane.style.top = top + 'px';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!dragging) return;
+            const mainRect = main.getBoundingClientRect();
+            let x = e.clientX - mainRect.left - offsetX;
+            let y = e.clientY - mainRect.top - offsetY;
+            // 限制在容器内
+            x = Math.max(0, Math.min(x, mainRect.width - mapPane.offsetWidth));
+            y = Math.max(0, Math.min(y, mainRect.height - mapPane.offsetHeight));
+            mapPane.style.left = x + 'px';
+            mapPane.style.top = y + 'px';
+            if (this.mapManager) this.mapManager.invalidateSize();
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (dragging) {
+                dragging = false;
+                if (this.mapManager) this.mapManager.invalidateSize();
+            }
         });
     }
 

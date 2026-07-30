@@ -391,6 +391,8 @@ body {
     border: 2px solid #30363d;
     z-index: 100;
     flex: none;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
 }
 
 .player-controls {

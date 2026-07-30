@@ -87,6 +87,7 @@ class MapCanvas(ttk.Frame):
         self.current_pos_idx = 0
         self.played_polyline = None
         self.speed_segments = []
+        self.dragging = False  # 画中画拖拽模式标志
 
         # 绑定事件
         self.canvas.bind('<Button-1>', self._on_click)
@@ -124,6 +125,8 @@ class MapCanvas(ttk.Frame):
 
     def _on_click(self, event):
         """地图点击事件"""
+        if self.dragging:
+            return
         if not self.track_points or not self.on_click_callback:
             return
 
@@ -419,6 +422,8 @@ class MP5PlayerApp:
         self.paned.pack_forget()
         self.video_frame.pack_forget()
         self.map_frame.pack_forget()
+        self.map_frame.place_forget()  # 清除画中画的 place 布局
+        self.map_canvas.dragging = False  # 退出画中画拖拽模式
         # 从 PanedWindow 中移除子组件（如果之前添加过）
         try:
             self.paned.forget(self.video_frame)
@@ -435,12 +440,12 @@ class MP5PlayerApp:
         elif view == '仅地图':
             self.map_frame.pack(in_=self.content, fill='both', expand=True)
         elif view == '画中画':
+            # 画中画：视频占满整个区域，地图用 place 浮在右下角
             self.video_frame.pack(in_=self.content, fill='both', expand=True)
-            self.map_frame.pack(in_=self.content, fill='both', expand=False, side='right',
-                               padx=(4, 0), pady=(4, 0))
-            # 设置地图面板为小窗口
-            self.map_frame.configure(height=200)
-            self.map_frame.pack_propagate(False)
+            self.map_frame.place(in_=self.content, relx=1.0, rely=1.0,
+                                 x=-10, y=-10, width=280, height=210,
+                                 anchor='se', bordermode='outside')
+            self._setup_pip_drag()
         else:  # 分屏 — 使用 PanedWindow，可拖拽分隔条调整宽度
             self.paned.pack(in_=self.content, fill='both', expand=True)
             self.paned.add(self.video_frame, weight=1)
@@ -460,6 +465,59 @@ class MP5PlayerApp:
                 self.root.after(100, self._set_split_equal)
         except Exception:
             pass
+
+    def _setup_pip_drag(self):
+        """让画中画的小地图窗口可拖拽移动"""
+        self._pip_dragging = False
+        self._pip_start_x = 0
+        self._pip_start_y = 0
+        # 通知 MapCanvas 进入拖拽模式，抑制点击回调
+        self.map_canvas.dragging = True
+
+        def on_press(event):
+            self._pip_dragging = True
+            self._pip_start_x = event.x_root
+            self._pip_start_y = event.y_root
+            # 记录地图面板当前位置
+            self._pip_orig_x = self.map_frame.winfo_rootx()
+            self._pip_orig_y = self.map_frame.winfo_rooty()
+            self.map_canvas.dragging = True
+
+        def on_drag(event):
+            if not self._pip_dragging:
+                return
+            dx = event.x_root - self._pip_start_x
+            dy = event.y_root - self._pip_start_y
+            new_x = self._pip_orig_x + dx
+            new_y = self._pip_orig_y + dy
+            # 限制在 content 容器内
+            cx = self.content.winfo_rootx()
+            cy = self.content.winfo_rooty()
+            cw = self.content.winfo_width()
+            ch = self.content.winfo_height()
+            mw = self.map_frame.winfo_width()
+            mh = self.map_frame.winfo_height()
+            new_x = max(cx, min(new_x, cx + cw - mw))
+            new_y = max(cy, min(new_y, cy + ch - mh))
+            # 转换为 content 内的相对坐标
+            rel_x = new_x - cx
+            rel_y = new_y - cy
+            self.map_frame.place_configure(x=rel_x, y=rel_y, relx=0, rely=0,
+                                           anchor='nw', bordermode='inside')
+            self.map_canvas._redraw()
+
+        def on_release(event):
+            if self._pip_dragging:
+                self._pip_dragging = False
+                self.map_canvas.dragging = False
+
+        # 绑定到地图面板和内部 canvas
+        self.map_frame.bind('<Button-1>', on_press)
+        self.map_frame.bind('<B1-Motion>', on_drag)
+        self.map_frame.bind('<ButtonRelease-1>', on_release)
+        self.map_canvas.bind('<Button-1>', on_press, add='+')
+        self.map_canvas.bind('<B1-Motion>', on_drag, add='+')
+        self.map_canvas.bind('<ButtonRelease-1>', on_release, add='+')
 
     def _setup_menu(self):
         """设置菜单栏"""
