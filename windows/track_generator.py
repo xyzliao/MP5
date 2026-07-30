@@ -2,7 +2,7 @@
 模拟GPS轨迹生成器
 根据视频时长生成模拟GPS轨迹，用于将MP4转换为MP5
 
-作者: MP5录播器
+作者: 大米斗（Aniseedaliao）
 """
 
 import math

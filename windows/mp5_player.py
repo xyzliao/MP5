@@ -21,7 +21,7 @@ MP5录播器 — Windows版桌面播放器
   - 优先使用 python-vlc 内嵌播放（需安装 pip install python-vlc 和 VLC播放器）
   - 未安装 python-vlc 时自动回退到系统默认播放器
 
-作者: MP5录播器
+作者: 大米斗（Aniseedaliao）
 """
 
 import sys
@@ -1274,7 +1274,7 @@ class MP5PlayerApp:
         about_text = """MP5录播器 — Windows版播放器
 
 版本: 1.0.0
-作者: MP5录播器
+作者: 大米斗（Aniseedaliao）
 
 MP5 = MP4 + Map
 

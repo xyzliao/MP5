@@ -1,7 +1,7 @@
 """
 GPX / GeoJSON 导出模块
 
-作者: MP5录播器
+作者: 大米斗（Aniseedaliao）
 """
 
 import json

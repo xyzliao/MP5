@@ -2,7 +2,7 @@
 GPX 文件导入模块
 解析 GPX 文件，提取轨迹点，转换为 GPSEntry 列表
 
-作者: MP5录播器
+作者: 大米斗（Aniseedaliao）
 """
 
 import xml.etree.ElementTree as ET

@@ -8,7 +8,7 @@ MP5 扩展 Box 类型:
   gsyn - 同步规则
   gpoi - POI标记数据
 
-作者: MP5录播器
+作者: 大米斗（Aniseedaliao）
 """
 
 import struct

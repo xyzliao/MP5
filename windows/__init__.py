@@ -2,7 +2,7 @@
 MP5录播器 — Windows版播放器
 基于 tkinter 的桌面 GUI 应用
 
-作者: MP5录播器
+作者: 大米斗（Aniseedaliao）
 """
 
 from .mp5_box import (
@@ -19,4 +19,4 @@ from .sync_engine import SyncEngine
 from .exporters import export_gpx, export_geojson, export_kml
 
 __version__ = '1.0.0'
-__author__ = 'MP5录播器'
+__author__ = '大米斗（Aniseedaliao）'

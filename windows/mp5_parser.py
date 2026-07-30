@@ -2,7 +2,7 @@
 MP5 文件解析器
 解析 MP5 文件，提取视频轨道、GPS轨迹、同步规则等元数据
 
-作者: MP5录播器
+作者: 大米斗（Aniseedaliao）
 """
 
 from mp5_box import (
