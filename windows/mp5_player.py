@@ -352,11 +352,14 @@ class MP5PlayerApp:
             self.info_frame.columnconfigure(i*2+1, weight=1, uniform='info_col')
 
         # ---- 主内容区 ----
-        content = ttk.Frame(main)
-        content.pack(fill='both', expand=True)
+        self.content = ttk.Frame(main)
+        self.content.pack(fill='both', expand=True)
+
+        # 可拖拽分隔的 PanedWindow（用于分屏模式）
+        self.paned = ttk.PanedWindow(self.content, orient='horizontal')
 
         # 视频面板
-        self.video_frame = ttk.LabelFrame(content, text='视频', padding=4)
+        self.video_frame = ttk.LabelFrame(self.content, text='视频', padding=4)
 
         if HAS_VLC:
             # VLC内嵌播放 — 用一个Frame作为VLC的视频输出目标
@@ -381,13 +384,16 @@ class MP5PlayerApp:
                                 '同时需要安装 VLC 播放器: https://www.videolan.org/')
 
         # 地图面板
-        self.map_frame = ttk.LabelFrame(content, text='地图', padding=4)
+        self.map_frame = ttk.LabelFrame(self.content, text='地图', padding=4)
         self.map_canvas = MapCanvas(self.map_frame, on_click_callback=self.on_map_click)
         self.map_canvas.pack(fill='both', expand=True)
 
-        # 默认分屏布局
+        # 默认分屏布局（视频|地图 50/50，可拖拽分隔条调整）
         self.current_view = '分屏'
         self._apply_view_layout()
+
+        # 等窗口渲染后设置初始平分比例
+        self.root.after(50, self._set_split_equal)
 
         # ---- 底部状态栏 ----
         self.status_var = tk.StringVar(value='就绪')
@@ -410,25 +416,45 @@ class MP5PlayerApp:
     def _apply_view_layout(self):
         """应用视图布局"""
         # 清除现有布局
+        self.paned.pack_forget()
         self.video_frame.pack_forget()
         self.map_frame.pack_forget()
+        # 从 PanedWindow 中移除子组件（如果之前添加过）
+        try:
+            self.paned.forget(self.video_frame)
+        except Exception:
+            pass
+        try:
+            self.paned.forget(self.map_frame)
+        except Exception:
+            pass
 
         view = self.current_view
         if view == '仅视频':
-            self.video_frame.pack(fill='both', expand=True, side='left')
+            self.video_frame.pack(in_=self.content, fill='both', expand=True)
         elif view == '仅地图':
-            self.map_frame.pack(fill='both', expand=True, side='left')
+            self.map_frame.pack(in_=self.content, fill='both', expand=True)
         elif view == '画中画':
-            self.video_frame.pack(fill='both', expand=True, side='left')
-            self.map_frame.pack(fill='both', expand=False, side='right',
+            self.video_frame.pack(in_=self.content, fill='both', expand=True)
+            self.map_frame.pack(in_=self.content, fill='both', expand=False, side='right',
                                padx=(4, 0), pady=(4, 0))
             # 设置地图面板为小窗口
             self.map_frame.configure(height=200)
             self.map_frame.pack_propagate(False)
-        else:  # 分屏
-            self.video_frame.pack(fill='both', expand=True, side='left', padx=(0, 4))
-            self.map_frame.pack(fill='both', expand=True, side='right')
+        else:  # 分屏 — 使用 PanedWindow，可拖拽分隔条调整宽度
+            self.paned.pack(in_=self.content, fill='both', expand=True)
+            self.paned.add(self.video_frame, weight=1)
+            self.paned.add(self.map_frame, weight=1)
             self.map_frame.pack_propagate(True)
+            # 设置默认平分
+            self.root.after(50, self._set_split_equal)
+
+    def _set_split_equal(self):
+        """将 PanedWindow 分隔条设置到正中（50/50平分）"""
+        try:
+            self.paned.sashpos(0, self.paned.winfo_width() // 2)
+        except Exception:
+            pass
 
     def _setup_menu(self):
         """设置菜单栏"""
