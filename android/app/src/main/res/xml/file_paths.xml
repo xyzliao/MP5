@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <files-path name="mp5_files" path="mp5/" />
+    <cache-path name="cache" path="." />
+    <external-files-path name="external" path="." />
+</paths>
