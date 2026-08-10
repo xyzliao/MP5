@@ -5,6 +5,8 @@ import androidx.room.PrimaryKey
 
 /**
  * MP5文件记录 — 存储在Room数据库中
+ *
+ * @author 大米斗（Aniseedaliao）
  */
 @Entity(tableName = "mp5_files")
 data class Mp5FileEntity(

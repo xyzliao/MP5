@@ -45,6 +45,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * 文件列表界面 — 显示所有MP5录制文件
+ *
+ * @author 大米斗（Aniseedaliao）
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FileListScreen(

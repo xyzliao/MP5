@@ -2,6 +2,7 @@ package com.daliao.mp5.ui.components
 
 import android.content.Context
 import android.graphics.Color
+import android.view.MotionEvent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -26,6 +27,8 @@ import org.osmdroid.views.overlay.Polyline
  * - 起点/终点标记
  * - 速度热力图着色
  * - 点击地图跳转视频
+ *
+ * @author 大米斗（Aniseedaliao）
  */
 @Composable
 fun Mp5MapView(
@@ -43,7 +46,8 @@ fun Mp5MapView(
         mapView.controller.setZoom(15.0)
 
         onDispose {
-            // osmdroid需要清理
+            // osmdroid需要清理资源
+            mapView.onDetach()
         }
     }
 
@@ -110,7 +114,18 @@ fun Mp5MapView(
 
     AndroidView(
         modifier = modifier.fillMaxSize(),
-        factory = { mapView }
+        factory = { mapView },
+        update = { view ->
+            // 绑定onMapClick触摸监听
+            view.setOnTouchListener { v, event ->
+                if (event.action == MotionEvent.ACTION_UP) {
+                    val proj = view.projection
+                    val geoPoint = proj.fromPixels(event.x.toInt(), event.y.toInt())
+                    onMapClick(geoPoint.latitude, geoPoint.longitude)
+                }
+                false
+            }
+        }
     )
 }
 

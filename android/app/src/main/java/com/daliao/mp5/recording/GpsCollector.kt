@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.StateFlow
  *
  * 采样率可配置：1Hz（步行）、5Hz（驾车）、10Hz（高速运动）
  * 提供实时位置状态Flow供UI订阅
+ *
+ * @author 大米斗（Aniseedaliao）
  */
 class GpsCollector(private val context: Context) {
 
@@ -36,6 +38,8 @@ class GpsCollector(private val context: Context) {
     private var startTimeMs: Long = 0
     private var locationCallback: LocationCallback? = null
 
+    private var paused = false
+
     var sampleRateHz: Int = 1
         private set
 
@@ -50,6 +54,7 @@ class GpsCollector(private val context: Context) {
         this.startTimeMs = startTimeMs
         samples.clear()
         _sampleCount.value = 0
+        paused = false
 
         if (!hasPermission()) return
 
@@ -70,6 +75,9 @@ class GpsCollector(private val context: Context) {
     }
 
     private fun onLocation(location: Location) {
+        // 暂停时不添加采样
+        if (paused) return
+
         val timestamp = System.currentTimeMillis() - startTimeMs
         val sample = GpsSample.fromDegrees(
             timestampMs = timestamp,
@@ -88,10 +96,25 @@ class GpsCollector(private val context: Context) {
     fun stop(): List<GpsSample> {
         locationCallback?.let { fusedClient.removeLocationUpdates(it) }
         locationCallback = null
+        paused = false
         return ArrayList(samples)
     }
 
     fun getCurrentSamples(): List<GpsSample> = ArrayList(samples)
+
+    /**
+     * 暂停GPS采样
+     */
+    fun pause() {
+        paused = true
+    }
+
+    /**
+     * 恢复GPS采样
+     */
+    fun resume() {
+        paused = false
+    }
 
     fun addPoi(label: String? = null) {
         val current = _currentLocation.value ?: return

@@ -13,6 +13,8 @@ import java.nio.ByteOrder
  * Box结构：
  *   [size(4)] [type(4)] [payload(size-8)]
  *   FullBox:  [size(4)] [type(4)] [version(1)] [flags(3)] [payload]
+ *
+ * @author 大米斗（Aniseedaliao）
  */
 object Mp5Box {
 
@@ -26,6 +28,9 @@ object Mp5Box {
     const val GLOC = "gloc"  // GPS坐标轨迹 ← 新增
     const val GMAP = "gmap"  // 嵌入地图数据 ← 新增
     const val GSYN = "gsyn"  // 同步规则 ← 新增
+    const val GPOI = "gpoi"  // POI标记数据 ← 新增
+    const val STCO = "stco"  // 32位 chunk offset
+    const val CO64 = "co64"  // 64位 chunk offset
 
     /** Box类型4字符码转为Int */
     fun fourCcToInt(type: String): Int {
@@ -187,12 +192,55 @@ object Mp5Box {
                 ?: return null
             currentOffset = result.first + 8  // 进入Box内部
             // 如果是FullBox，再跳过4字节
-            if (type == "meta" || type == GLOC || type == GMAP || type == GSYN || type == MVHD || type == HDLR) {
+            if (type == "meta" || type == GLOC || type == GMAP || type == GSYN || type == GPOI || type == MVHD || type == HDLR) {
                 currentOffset += 4
             }
             currentEnd = result.first + result.second
         }
         return result
+    }
+
+    /**
+     * 递归查找容器Box内所有指定类型的子Box
+     * @param file 已打开的文件
+     * @param parentOffset 父Box起始偏移
+     * @param parentSize 父Box总大小
+     * @param targetTypes 要查找的Box类型集合
+     * @return 列表 of Triple(boxOffset, boxSize, isFullBox)
+     */
+    fun findAllBoxesInContainer(
+        file: RandomAccessFile,
+        parentOffset: Long,
+        parentSize: Long,
+        targetTypes: Set<String>
+    ): List<Triple<Long, Long, Boolean>> {
+        val results = mutableListOf<Triple<Long, Long, Boolean>>()
+        val fullBoxTypes = setOf(MVHD, "meta", HDLR, GLOC, GMAP, GSYN, GPOI, STCO, CO64, "stsd", "stts", "stss", "ctts", "stsc", "stsz")
+        var offset = parentOffset + 8  // 跳过父Box header
+        val end = parentOffset + parentSize
+
+        while (offset + 8 <= end) {
+            file.seek(offset)
+            val size = file.readInt().toLong() and 0xFFFFFFFFL
+            val typeInt = file.readInt()
+            if (size < 8) break
+
+            val type = intToFourCc(typeInt)
+            if (type in targetTypes) {
+                results.add(Triple(offset, size, type in fullBoxTypes))
+            }
+
+            // 递归进入子Box（对于容器Box）
+            // 容器Box: moov, trak, mdia, minf, stbl, udta
+            // 非容器Box直接跳过
+            val containers = setOf("moov", "trak", "mdia", "minf", "stbl", "udta", "edts")
+            if (type in containers) {
+                results.addAll(findAllBoxesInContainer(file, offset, size, targetTypes))
+            }
+
+            offset += size
+        }
+        return results
     }
 
     /**

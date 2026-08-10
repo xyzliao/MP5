@@ -11,6 +11,11 @@ import androidx.compose.ui.Modifier
 import com.daliao.mp5.ui.MP5NavHost
 import com.daliao.mp5.ui.theme.MP5Theme
 
+/**
+ * MainActivity — 应用主入口
+ *
+ * @author 大米斗（Aniseedaliao）
+ */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

@@ -57,6 +57,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daliao.mp5.recording.Mp5Recorder
 import java.util.concurrent.Executors
 
+/**
+ * 录制界面 — CameraX视频预览 + GPS采集 + 录制控制
+ *
+ * @author 大米斗（Aniseedaliao）
+ */
 @Composable
 fun RecordScreen(
     onFinished: (Long?) -> Unit,
@@ -355,7 +360,7 @@ fun RecordScreen(
         LaunchedEffect(state) {
             if (state == Mp5Recorder.State.IDLE && rec.lastInsertedId != null) {
                 val id = rec.lastInsertedId
-                rec.lastInsertedId = null
+                rec.clearLastInsertedId()
                 onFinished(id)
             }
         }

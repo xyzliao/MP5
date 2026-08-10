@@ -7,6 +7,11 @@ import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * MP5文件DAO — 数据库访问对象
+ *
+ * @author 大米斗（Aniseedaliao）
+ */
 @Dao
 interface Mp5FileDao {
 

@@ -5,6 +5,11 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
+/**
+ * MP5 Room数据库
+ *
+ * @author 大米斗（Aniseedaliao）
+ */
 @Database(entities = [Mp5FileEntity::class], version = 1, exportSchema = false)
 abstract class Mp5Database : RoomDatabase() {
     abstract fun mp5FileDao(): Mp5FileDao

@@ -5,8 +5,16 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.daliao.mp5.format.Mp5Parser
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import java.io.File
 
 /**
@@ -14,6 +22,8 @@ import java.io.File
  *
  * 视频→地图：播放位置变化时，查询gloc获取GPS坐标
  * 地图→视频：地图点击时，查找最近GPS点的时间戳，seek视频
+ *
+ * @author 大米斗（Aniseedaliao）
  */
 class Mp5PlayerController(private val context: Context) {
 
@@ -48,6 +58,10 @@ class Mp5PlayerController(private val context: Context) {
     private val _maxSpeed = MutableStateFlow(0.0)
     val maxSpeed: StateFlow<Double> = _maxSpeed
 
+    // 协程作用域和轮询Job
+    private val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var pollingJob: Job? = null
+
     fun loadFile(filePath: String) {
         val file = File(filePath)
         if (!file.exists()) return
@@ -79,26 +93,28 @@ class Mp5PlayerController(private val context: Context) {
     }
 
     private fun startPolling() {
-        exoPlayer?.let { player ->
-            Thread {
-                while (true) {
-                    try {
-                        val pos = player.currentPosition
-                        val dur = player.duration
-                        _currentPositionMs.value = pos
-                        if (dur > 0) _durationMs.value = dur
+        pollingJob?.cancel()
+        val player = exoPlayer ?: return
+        val parser = mp5Parser
 
-                        // 查询当前GPS位置
-                        if (mp5Parser != null && mp5Parser!!.gpsSamples.isNotEmpty()) {
-                            _currentGps.value = mp5Parser!!.getGpsAtTime(pos)
-                        }
+        pollingJob = controllerScope.launch {
+            while (isActive) {
+                try {
+                    val pos = player.currentPosition
+                    val dur = player.duration
+                    _currentPositionMs.value = pos
+                    if (dur > 0) _durationMs.value = dur
 
-                        Thread.sleep(50) // 20fps更新
-                    } catch (e: Exception) {
-                        break
+                    // 查询当前GPS位置
+                    if (parser != null && parser.gpsSamples.isNotEmpty()) {
+                        _currentGps.value = parser.getGpsAtTime(pos)
                     }
+
+                    delay(50) // 20fps更新
+                } catch (e: Exception) {
+                    break
                 }
-            }.start()
+            }
         }
     }
 
@@ -114,7 +130,10 @@ class Mp5PlayerController(private val context: Context) {
     }
 
     fun release() {
+        pollingJob?.cancel()
+        pollingJob = null
         exoPlayer?.release()
         exoPlayer = null
+        controllerScope.cancel()
     }
 }

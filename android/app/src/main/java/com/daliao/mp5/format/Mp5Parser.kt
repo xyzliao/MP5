@@ -9,9 +9,11 @@ import java.nio.ByteOrder
  * MP5 Parser — 解析MP5文件，提取GPS轨迹和同步规则
  *
  * 1. 读取ftyp确认是MP5文件（major_brand=mp5v）
- * 2. 在moov/meta中查找gloc、gmap、gsyn box
+ * 2. 在moov/meta中查找gloc、gmap、gsyn、gpoi box
  * 3. 解析GPS采样点列表
  * 4. 向后兼容：如果无gloc box，则按普通MP4处理
+ *
+ * @author 大米斗（Aniseedaliao）
  */
 class Mp5Parser(private val file: File) {
 
@@ -33,6 +35,9 @@ class Mp5Parser(private val file: File) {
         private set
 
     var syncRules: SyncRules = SyncRules()
+        private set
+
+    var pois: List<GpsSample> = emptyList()
         private set
 
     var hasMapData: Boolean = false
@@ -62,7 +67,15 @@ class Mp5Parser(private val file: File) {
                 isMp5 = true
             }
 
-            // 3. 查找 moov/meta/gsyn
+            // 3. 查找 moov/meta/gpoi
+            val gpoiPath = Mp5Box.findBoxPath(raf, listOf(Mp5Box.MOOV, Mp5Box.META, Mp5Box.GPOI))
+            if (gpoiPath != null) {
+                val (offset, size) = gpoiPath
+                val payload = Mp5Box.readBoxPayload(raf, offset, size, isFullBox = true)
+                pois = parseGpoiPayload(payload)
+            }
+
+            // 4. 查找 moov/meta/gsyn
             val gsynPath = Mp5Box.findBoxPath(raf, listOf(Mp5Box.MOOV, Mp5Box.META, Mp5Box.GSYN))
             if (gsynPath != null) {
                 val (offset, size) = gsynPath
@@ -70,7 +83,7 @@ class Mp5Parser(private val file: File) {
                 syncRules = parseGsynPayload(payload)
             }
 
-            // 4. 查找 moov/meta/gmap
+            // 5. 查找 moov/meta/gmap
             val gmapPath = Mp5Box.findBoxPath(raf, listOf(Mp5Box.MOOV, Mp5Box.META, Mp5Box.GMAP))
             hasMapData = gmapPath != null
         }
@@ -112,7 +125,53 @@ class Mp5Parser(private val file: File) {
     }
 
     /**
+     * 解析gpoi Box payload
+     *
+     * entry_count(4B)
+     * for each poi:
+     *   timestamp(8B) + latitudeE7(8B) + longitudeE7(8B) +
+     *   label_length(2B) + label_bytes + type(1B)
+     */
+    private fun parseGpoiPayload(payload: ByteArray): List<GpsSample> {
+        if (payload.size < 4) return emptyList()
+        val buf = ByteBuffer.wrap(payload).order(ByteOrder.BIG_ENDIAN)
+        val poiCount = buf.readUInt32().toInt()
+        if (poiCount <= 0) return emptyList()
+
+        val results = ArrayList<GpsSample>(poiCount)
+        repeat(poiCount) {
+            if (buf.remaining() < 27) return@repeat  // 8+8+8+2+0+1 = 27 (minimum)
+            val timestampMs = buf.readUInt64()
+            val latE7 = buf.readInt64()
+            val lonE7 = buf.readInt64()
+            val labelLen = buf.readUInt16()
+            if (buf.remaining() < labelLen + 1) return@repeat
+            val labelBytes = ByteArray(labelLen)
+            buf.get(labelBytes)
+            val label = String(labelBytes, Charsets.UTF_8)
+            val typeByte = buf.readUInt8()
+            val isPoi = typeByte != 0
+            results.add(GpsSample(
+                timestampMs = timestampMs,
+                latitudeE7 = latE7,
+                longitudeE7 = lonE7,
+                altitudeDm = 0,
+                accuracyM = 0,
+                headingDeg = 0,
+                speedKmhX10 = 0,
+                isPoi = isPoi,
+                poiLabel = if (label.isNotEmpty()) label else null
+            ))
+        }
+        return results
+    }
+
+    /**
      * 解析gsyn Box payload
+     *
+     * 与Windows版SyncConfig.decode对齐（struct.unpack_from('>BiBfBBBB', ...)）：
+     *   sync_mode(1B) + sync_offset(4B) + interpolation(1B) + video_ratio(4B) +
+     *   map_style(1B) + show_trajectory(1B) + show_poi(1B) + default_view(1B)
      */
     private fun parseGsynPayload(payload: ByteArray): SyncRules {
         if (payload.size < 14) return SyncRules()
@@ -121,11 +180,11 @@ class Mp5Parser(private val file: File) {
             syncMode = buf.readUInt8(),
             syncOffsetMs = buf.readInt32(),
             interpolation = buf.readUInt8(),
-            defaultView = buf.readUInt8(),
             videoRatio = buf.readFloat32(),
             mapStyle = buf.readUInt8(),
             showTrajectory = buf.readUInt8() != 0,
-            showPoi = buf.readUInt8() != 0
+            showPoi = buf.readUInt8() != 0,
+            defaultView = buf.readUInt8()
         )
     }
 

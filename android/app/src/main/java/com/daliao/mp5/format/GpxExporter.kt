@@ -8,6 +8,8 @@ import java.util.TimeZone
 
 /**
  * GPX导出器 — 将GPS采样点导出为标准GPX 1.1文件
+ *
+ * @author 大米斗（Aniseedaliao）
  */
 object GpxExporter {
 

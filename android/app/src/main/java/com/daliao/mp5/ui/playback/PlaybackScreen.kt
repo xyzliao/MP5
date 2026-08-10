@@ -44,8 +44,18 @@ import com.daliao.mp5.ui.components.Mp5MapView
 import androidx.media3.ui.PlayerView
 import androidx.compose.ui.viewinterop.AndroidView
 
+/**
+ * 视图模式枚举
+ *
+ * @author 大米斗（Aniseedaliao）
+ */
 enum class ViewMode { VIDEO_ONLY, MAP_ONLY, SPLIT_LR, SPLIT_TB, PIP }
 
+/**
+ * 播放界面 — 视频播放 + GPS地图同步
+ *
+ * @author 大米斗（Aniseedaliao）
+ */
 @Composable
 fun PlaybackScreen(
     fileId: Long,

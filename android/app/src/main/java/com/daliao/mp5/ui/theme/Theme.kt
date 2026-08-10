@@ -27,6 +27,11 @@ private val DarkColorScheme = darkColorScheme(
     surface = Color(0xFF303134),
 )
 
+/**
+ * MP5应用主题
+ *
+ * @author 大米斗（Aniseedaliao）
+ */
 @Composable
 fun MP5Theme(
     darkTheme: Boolean = isSystemInDarkTheme(),

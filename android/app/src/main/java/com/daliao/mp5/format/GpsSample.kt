@@ -6,6 +6,8 @@ package com.daliao.mp5.format
  * 经纬度使用整数×10^7存储，避免IEEE 754浮点精度问题。
  * 例如：北纬39.9042° → 399042000
  *
+ * @author 大米斗（Aniseedaliao）
+ *
  * @param timestampMs 毫秒时间戳，相对于mvhd的时间起点
  * @param latitudeE7 纬度 ×10^7 (WGS84)
  * @param longitudeE7 经度 ×10^7 (WGS84)

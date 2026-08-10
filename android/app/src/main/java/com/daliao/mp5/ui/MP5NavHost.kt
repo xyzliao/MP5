@@ -8,6 +8,11 @@ import com.daliao.mp5.ui.files.FileListScreen
 import com.daliao.mp5.ui.playback.PlaybackScreen
 import com.daliao.mp5.ui.record.RecordScreen
 
+/**
+ * 导航路由定义
+ *
+ * @author 大米斗（Aniseedaliao）
+ */
 object Routes {
     const val FILES = "files"
     const val RECORD = "record"
@@ -16,6 +21,11 @@ object Routes {
     fun playback(fileId: Long) = "playback/$fileId"
 }
 
+/**
+ * MP5导航Host — 管理页面路由
+ *
+ * @author 大米斗（Aniseedaliao）
+ */
 @Composable
 fun MP5NavHost() {
     val navController = rememberNavController()
