@@ -18,5 +18,5 @@ from .mp5_parser import MP5Parser, MP5Info, TrackInfo
 from .sync_engine import SyncEngine
 from .exporters import export_gpx, export_geojson, export_kml
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 __author__ = '大米斗（Aniseedaliao）'
