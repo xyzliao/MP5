@@ -266,6 +266,7 @@ class MP5PlayerApp:
         self.sync_engine = None
         self.video_player = None
         self.is_playing = False
+        self._is_paused = False  # 暂停标志（用于恢复播放时跳过重新加载）
         self.playback_time = 0.0
         self.playback_start = 0.0
         self.playback_thread = None
@@ -947,6 +948,18 @@ class MP5PlayerApp:
         if not self.file_data:
             return
 
+        # 从暂停状态恢复 — 直接解除VLC暂停，不重新加载媒体
+        if self._is_paused and HAS_VLC and self.vlc_player:
+            self.is_playing = True
+            self._is_paused = False
+            self.btn_play.config(text='⏸ 暂停')
+            self.playback_stop.clear()
+            self.vlc_player.set_pause(0)  # 解除暂停，继续从当前位置播放
+            self.playback_start = time.time() - (self.playback_time / 1000.0)
+            self.playback_thread = threading.Thread(target=self._playback_loop, daemon=True)
+            self.playback_thread.start()
+            return
+
         self.is_playing = True
         self.btn_play.config(text='⏸ 暂停')
         self.playback_stop.clear()
@@ -1062,6 +1075,7 @@ class MP5PlayerApp:
     def _on_playback_finished(self):
         """播放结束 — 恢复到等待播放状态"""
         self.is_playing = False
+        self._is_paused = False
         self.playback_stop.set()
         self.playback_time = 0  # 归零，下次播放从头开始
         self.btn_play.config(text='▶ 播放')
@@ -1089,6 +1103,7 @@ class MP5PlayerApp:
     def pause_play(self):
         """暂停播放"""
         self.is_playing = False
+        self._is_paused = True  # 标记为暂停状态，恢复时不重新加载
         self.btn_play.config(text='▶ 播放')
         self.playback_stop.set()
 
@@ -1098,6 +1113,7 @@ class MP5PlayerApp:
     def stop_play(self):
         """停止播放"""
         self.is_playing = False
+        self._is_paused = False
         self.btn_play.config(text='▶ 播放')
         self.playback_stop.set()
         self.playback_time = 0
