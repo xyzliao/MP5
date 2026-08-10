@@ -1,0 +1,90 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+/* Begin PBXFileReference section */
+		AA000001 /* MP5iOSApp.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MP5iOSApp.swift; sourceTree = "<group>"; };
+		AA000002 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AA000010 /* FileListView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FileListView.swift; sourceTree = "<group>"; };
+		AA000011 /* RecordView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RecordView.swift; sourceTree = "<group>"; };
+		AA000012 /* PlaybackView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlaybackView.swift; sourceTree = "<group>"; };
+		AA000013 /* Mp5MapView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Mp5MapView.swift; sourceTree = "<group>"; };
+		AA000014 /* CreateMp5View.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CreateMp5View.swift; sourceTree = "<group>"; };
+		AA000020 /* FileListViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FileListViewModel.swift; sourceTree = "<group>"; };
+		AA000021 /* PlaybackViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlaybackViewModel.swift; sourceTree = "<group>"; };
+		AA000022 /* RecordViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RecordViewModel.swift; sourceTree = "<group>"; };
+		AA000030 /* GpsCollector.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GpsCollector.swift; sourceTree = "<group>"; };
+		AA000031 /* VideoRecorder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VideoRecorder.swift; sourceTree = "<group>"; };
+		AA000032 /* Mp5Recorder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Mp5Recorder.swift; sourceTree = "<group>"; };
+		AA000040 /* Mp5Store.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Mp5Store.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		AA100000 /* MP5iOS */ = {
+			isa = PBXGroup;
+			children = (
+				AA100001 /* App */,
+				AA100002 /* Views */,
+				AA100003 /* ViewModels */,
+				AA100004 /* Services */,
+				AA100005 /* Persistence */,
+				AA000002 /* Info.plist */,
+			);
+			path = MP5iOS;
+			sourceTree = "<group>";
+		};
+		AA100001 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001 /* MP5iOSApp.swift */,
+			);
+			path = ".";
+			sourceTree = "<group>";
+		};
+		AA100002 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				AA000010 /* FileListView.swift */,
+				AA000011 /* RecordView.swift */,
+				AA000012 /* PlaybackView.swift */,
+				AA000013 /* Mp5MapView.swift */,
+				AA000014 /* CreateMp5View.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		AA100003 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				AA000020 /* FileListViewModel.swift */,
+				AA000021 /* PlaybackViewModel.swift */,
+				AA000022 /* RecordViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		AA100004 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				AA000030 /* GpsCollector.swift */,
+				AA000031 /* VideoRecorder.swift */,
+				AA000032 /* Mp5Recorder.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		AA100005 /* Persistence */ = {
+			isa = PBXGroup;
+			children = (
+				AA000040 /* Mp5Store.swift */,
+			);
+			path = Persistence;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+	};
+	rootObject = AA100000 /* MP5iOS */;
+}
