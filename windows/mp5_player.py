@@ -1289,7 +1289,7 @@ class MP5PlayerApp:
         """显示关于对话框"""
         about_text = """MP5录播器 — Windows版播放器
 
-版本: 1.0.1
+版本: 1.0.10
 作者: 大米斗（Aniseedaliao）
 
 MP5 = MP4 + Map
