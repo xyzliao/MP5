@@ -33,8 +33,12 @@ import tempfile
 from pathlib import Path
 from datetime import datetime
 
-# 添加父目录到路径，以便导入 mp5 模块
-sys.path.insert(0, str(Path(__file__).parent))
+# 添加模块所在目录到路径（兼容 PyInstaller 冻结环境和普通运行）
+if getattr(sys, 'frozen', False):
+    # PyInstaller --onefile 模式：模块被解压到 sys._MEIPASS
+    sys.path.insert(0, sys._MEIPASS)
+else:
+    sys.path.insert(0, str(Path(__file__).parent))
 
 from mp5_box import (
     GPSEntry, SyncConfig, POI,
