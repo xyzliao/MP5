@@ -4,3 +4,8 @@ node_modules/
 __pycache__/
 .env
 test/sample.mp5
+
+# PyInstaller 构建产物
+windows/build/
+windows/dist/
+windows/*.spec
