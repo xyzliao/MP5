@@ -590,4 +590,80 @@ import AVFoundation
 
 ---
 
+---
+
+## 十五、macOS版实现说明
+
+### 15.1 已实现的 macOS App
+
+MP5macOS 目录包含完整的 macOS 原生应用，使用 SwiftUI + MapKit + AVPlayer。
+
+**项目结构：**
+
+```
+MP5macOS/
+├── Package.swift               # SPM 配置（依赖 MP5Core）
+├── MP5MacApp.swift             # App 入口 + NavigationSplitView 主窗口
+├── Info.plist                  # macOS 配置（MP5/MP4 文件类型注册）
+├── MP5macOS.entitlements       # 沙盒权限（用户文件读写）
+├── Views/
+│   ├── FileListView.swift      # 侧边栏文件列表（macOS 样式）
+│   ├── PlaybackView.swift      # 播放界面（HSplitView/VSplitView 分屏）
+│   ├── Mp5MapView.swift        # MapKit 地图（NSViewRepresentable）
+│   └── CreateMp5View.swift     # 从MP4制作MP5（NSOpenPanel 文件选择）
+├── ViewModels/
+│   ├── PlaybackViewModel.swift # 播放逻辑（与 iOS 一致 + 导出功能）
+│   └── FileListViewModel.swift # 文件列表逻辑 + 目录扫描
+└── Persistence/
+    └── Mp5Store.swift          # SwiftData 文件管理（Application Support 目录）
+```
+
+### 15.2 与 iOS 版的关键差异
+
+| 差异项 | iOS | macOS |
+|--------|-----|-------|
+| 地图封装 | UIViewRepresentable | NSViewRepresentable |
+| 点击手势 | UITapGestureRecognizer | NSClickGestureRecognizer |
+| 颜色类型 | UIColor | NSColor |
+| 图标加载 | UIImage(systemName:) | NSImage(systemSymbolName:) |
+| 文件选择 | UIDocumentPickerViewController | NSOpenPanel |
+| 文件保存 | 无（自动保存到 Documents） | NSSavePanel |
+| 文件存储 | Documents/mp5/ | Application Support/MP5录播器/mp5/ |
+| 导航方式 | TabView + sheet | NavigationSplitView（侧边栏） |
+| 分屏方式 | HStack/VStack（固定比例） | HSplitView/VSplitView（可拖拽） |
+| 录制功能 | ✅ 有 | ❌ 无 |
+| 键盘快捷键 | 无 | 空格=播放/暂停，←→=快退/快进 |
+| 导出UI | 无 | NSSavePanel + Menu |
+| 画中画尺寸 | 160×120 | 320×240（大屏适配） |
+
+### 15.3 macOS 独有功能
+
+1. **可拖拽分屏**：使用 HSplitView / VSplitView，用户可拖拽分隔条调整视频和地图的比例
+2. **目录扫描**：启动时自动扫描 mp5 目录，将未入库的文件加入数据库
+3. **Finder 集成**：右键菜单支持「在 Finder 中显示」
+4. **键盘快捷键**：空格键暂停/播放，左右箭头快退/快进10秒
+5. **导出功能**：播放界面内置导出菜单，支持 GPX / GeoJSON / KML / MP4 导出
+6. **菜单栏集成**：菜单栏「文件 → 从MP4制作MP5」快捷入口（Cmd+N）
+
+### 15.4 共享代码
+
+- **MP5Core**：100% 共享（Mp5Box/Mp5Parser/Mp5Muxer/SyncEngine/GpsSample/SyncRules/Poi/导出器）
+- **ViewModels**：逻辑基本一致，macOS 版增加了导出方法和目录扫描
+- **Mp5Store**：字段完全一致，仅存储目录不同
+- **GpxParser**：CreateMp5View 中的 GPX 解析器完全复用
+
+### 15.5 编译方式
+
+**Swift Package Manager：**
+```bash
+cd MP5Core && swift build
+cd MP5macOS && swift build
+```
+
+**Xcode：**
+在 Xcode 中打开 MP5macOS/Package.swift，选择 macOS 目标编译运行。
+
+---
+
 *大米斗（Aniseedaliao），写于2026年8月10日*
+*macOS版补充：2026年8月13日*
