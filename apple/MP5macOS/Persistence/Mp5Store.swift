@@ -8,7 +8,7 @@
 // macOS 使用 Application Support 目录存储 MP5 文件。
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.10
+// 版本: 1.0.20
 //
 
 import Foundation

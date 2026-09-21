@@ -7,7 +7,7 @@
 // 与 Windows版 export_gpx() 和 Android版 GpxExporter 对齐。
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.10
+// 版本: 1.0.20
 //
 
 import Foundation

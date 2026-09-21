@@ -7,7 +7,7 @@
 // 对应 Windows版 "制作MP5" 功能和 Android版 CreateMp5View。
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.10
+// 版本: 1.0.20
 //
 
 import SwiftUI

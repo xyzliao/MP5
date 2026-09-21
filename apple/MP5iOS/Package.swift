@@ -3,7 +3,7 @@
 // MP5iOS — iOS App Package
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.10
+// 版本: 1.0.20
 
 import PackageDescription
 

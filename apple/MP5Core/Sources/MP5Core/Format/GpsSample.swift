@@ -10,7 +10,7 @@
 // 与 Windows版 GPSEntry 和 Android版 GpsSample 完全对齐。
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.10
+// 版本: 1.0.20
 //
 
 import Foundation

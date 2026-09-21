@@ -8,7 +8,7 @@
 // macOS 版可以直接访问文件系统，无需安全作用域 URI。
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.10
+// 版本: 1.0.20
 //
 
 import SwiftUI

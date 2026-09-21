@@ -11,7 +11,7 @@
 //   - 从MP4制作MP5（导入GPX）
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.10
+// 版本: 1.0.20
 //
 
 import SwiftUI

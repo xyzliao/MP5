@@ -7,7 +7,7 @@
 // 与 iOS版 FileListViewModel 逻辑一致，适配 macOS SwiftData。
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.10
+// 版本: 1.0.20
 //
 
 import Foundation

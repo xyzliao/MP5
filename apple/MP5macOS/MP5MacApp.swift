@@ -11,7 +11,7 @@
 //   - 不含录制（macOS无摄像头/GPS采集需求）
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.10
+// 版本: 1.0.20
 //
 
 import SwiftUI
@@ -66,7 +66,7 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
 
-                    Text("版本 1.0.10  ·  大米斗（Aniseedaliao）")
+                    Text("版本 1.0.20  ·  大米斗（Aniseedaliao）")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }

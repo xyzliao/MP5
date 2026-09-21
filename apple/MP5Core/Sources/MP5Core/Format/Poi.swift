@@ -11,7 +11,7 @@
 //   label_length(2B) + label_bytes(UTF-8) + type(1B)
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.10
+// 版本: 1.0.20
 //
 
 import Foundation

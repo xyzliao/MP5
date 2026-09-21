@@ -10,7 +10,7 @@
 // 对应 Android版 GpsCollector（FusedLocationProvider）。
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.10
+// 版本: 1.0.20
 //
 
 import Foundation
