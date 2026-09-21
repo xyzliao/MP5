@@ -90,6 +90,9 @@ class Mp5PlayerController(private val context: Context) {
 
         // 启动位置轮询
         startPolling()
+
+        // 文件加载完成后自动播放
+        exoPlayer?.playWhenReady = true
     }
 
     private fun startPolling() {

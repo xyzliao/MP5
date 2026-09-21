@@ -78,11 +78,14 @@ public class PlaybackViewModel: ObservableObject {
         }
 
         // 监听播放状态
-        player?.publisher(for: \.timeControlStatus)
+        player?.publisher(for: \\.timeControlStatus)
             .sink { [weak self] status in
                 self?.isPlaying = (status == .playing)
             }
             .store(in: &cancellables)
+
+        // 文件加载完成后自动播放
+        play()
     }
 
     private func onTimeUpdated(_ time: CMTime) {

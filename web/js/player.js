@@ -70,6 +70,16 @@ export class Player {
         this.videoElement = videoElement;
         this.videoElement.src = this.videoBlobUrl;
 
+        // 文件加载完成后自动播放
+        this.videoElement.play().catch(() => {
+            // 有声自动播放被浏览器阻止，尝试静音播放
+            this.videoElement.muted = true;
+            this.videoElement.play().catch(() => {
+                // 静音也被阻止，用户需手动点击播放按钮
+                console.log('自动播放被浏览器阻止，需手动点击播放');
+            });
+        });
+
         // 初始化地图
         this.mapManager = new MapManager(mapContainer);
 

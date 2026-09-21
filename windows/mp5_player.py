@@ -603,6 +603,9 @@ class MP5PlayerApp:
                                f'({"MP5" if self.mp5_info.is_mp5 else "MP4"}, '
                                f'{len(self.file_data)} bytes)')
 
+            # 文件加载完成后自动开始播放
+            self.start_play()
+
         except Exception as e:
             messagebox.showerror('错误', f'加载文件失败:\n{e}')
             self.status_var.set('加载失败')
