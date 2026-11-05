@@ -332,6 +332,14 @@ class MP5PlayerApp:
         ttk.Button(toolbar, text='导出KML', command=self.export_kml).pack(side='left', padx=4)
         ttk.Button(toolbar, text='导出MP4', command=self.export_mp4).pack(side='left', padx=4)
 
+        ttk.Separator(toolbar, orient='vertical').pack(side='left', fill='y', padx=8)
+
+        # 文件信息栏显隐切换
+        self.info_visible = tk.BooleanVar(value=True)
+        self.btn_toggle_info = ttk.Checkbutton(toolbar, text='文件信息', variable=self.info_visible,
+                                                 command=self._toggle_info_frame)
+        self.btn_toggle_info.pack(side='left', padx=4)
+
         # ---- 文件信息栏 ----
         self.info_frame = ttk.LabelFrame(main, text='文件信息', padding=8)
         self.info_frame.pack(fill='x', pady=(0, 8))
@@ -420,6 +428,14 @@ class MP5PlayerApp:
 
         self.time_label = ttk.Label(self.progress_frame, text='00:00 / 00:00')
         self.time_label.pack(side='left', padx=8)
+
+    def _toggle_info_frame(self):
+        """显示/隐藏文件信息栏"""
+        if self.info_visible.get():
+            self.info_frame.pack(fill='x', pady=(0, 8),
+                                 before=self.content)
+        else:
+            self.info_frame.pack_forget()
 
     def _apply_view_layout(self):
         """应用视图布局"""
