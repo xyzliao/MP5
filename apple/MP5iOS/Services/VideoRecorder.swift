@@ -8,7 +8,7 @@
 // 使用 AVCaptureSession + AVCaptureMovieFileOutput 录制MP4到临时文件。
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.20
+// 版本: 1.0.21
 //
 
 import Foundation

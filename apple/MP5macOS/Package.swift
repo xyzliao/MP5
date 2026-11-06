@@ -6,7 +6,7 @@
 // 不含录制功能（无摄像头/GPS），但支持完整的播放和制作体验。
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.20
+// 版本: 1.0.21
 
 import PackageDescription
 

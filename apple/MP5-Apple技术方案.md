@@ -1,6 +1,6 @@
 # MP5录播器 — iOS/macOS版技术方案
 
-**版本：** 1.0.20  
+**版本：** 1.0.21  
 **日期：** 2026年8月10日  
 **作者：** 大米斗（Aniseedaliao）
 
@@ -543,7 +543,7 @@ import AVFoundation
 | 暂停续录 | ✅ | ✅ | ✅ |
 | 导出MP4/GPX/GeoJSON/KML | ✅ | ✅ | ✅ |
 | 作者署名 | ✅ | ✅ | ✅ |
-| 版本号 | 1.0.20 | 1.0.20 | 1.0.20 |
+| 版本号 | 1.0.21 | 1.0.21 | 1.0.21 |
 
 ---
 
@@ -586,7 +586,7 @@ import AVFoundation
 4. **gpoi box**：必须实现，否则 POI 标记在跨平台时丢失
 5. **hdlr FullBox**：必须用 FullBox 格式，否则严格解析器会拒绝
 6. **作者署名**：所有 Swift 文件 KDoc 注释包含 `@author 大米斗（Aniseedaliao）`
-7. **版本号**：1.0.20，与 Windows/Android 一致
+7. **版本号**：1.0.21，与 Windows/Android 一致
 
 ---
 

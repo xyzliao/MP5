@@ -8,7 +8,7 @@
 // 使用 AVPlayer 视频播放 + MapKit 地图渲染，5种视图模式。
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.20
+// 版本: 1.0.21
 //
 
 import SwiftUI

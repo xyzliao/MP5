@@ -13,7 +13,7 @@
 // 对应 Android版 Mp5Recorder。
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.20
+// 版本: 1.0.21
 //
 
 import Foundation

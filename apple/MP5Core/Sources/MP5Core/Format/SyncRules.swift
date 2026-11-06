@@ -9,7 +9,7 @@
 //           map_style(1B) + show_trajectory(1B) + show_poi(1B) + default_view(1B) = 14 bytes
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.20
+// 版本: 1.0.21
 //
 
 import Foundation

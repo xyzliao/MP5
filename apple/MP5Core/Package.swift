@@ -4,7 +4,7 @@
 // MP5格式核心逻辑：解析、封装、导出、同步引擎
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.20
+// 版本: 1.0.21
 
 import PackageDescription
 

@@ -8,7 +8,7 @@
 // 使用 AVPlayer.addPeriodicTimeObserver 替代轮询线程，20fps更新。
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.20
+// 版本: 1.0.21
 //
 
 import Foundation

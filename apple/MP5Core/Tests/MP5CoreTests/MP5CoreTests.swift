@@ -5,7 +5,7 @@
 // MP5格式核心测试 — 验证二进制格式与Windows/Android版本兼容
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.20
+// 版本: 1.0.21
 //
 
 import XCTest

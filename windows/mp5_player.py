@@ -324,6 +324,12 @@ class MP5PlayerApp:
         view_combo.pack(side='left', padx=4)
         view_combo.bind('<<ComboboxSelected>>', self.switch_view)
 
+        # 文件信息栏显隐切换（视图区域内）
+        self.info_visible = tk.BooleanVar(value=True)
+        self.btn_toggle_info = ttk.Checkbutton(toolbar, text='文件信息', variable=self.info_visible,
+                                                 command=self._toggle_info_frame)
+        self.btn_toggle_info.pack(side='left', padx=4)
+
         ttk.Separator(toolbar, orient='vertical').pack(side='left', fill='y', padx=8)
 
         # 导出按钮
@@ -331,14 +337,6 @@ class MP5PlayerApp:
         ttk.Button(toolbar, text='导出GeoJSON', command=self.export_geojson).pack(side='left', padx=4)
         ttk.Button(toolbar, text='导出KML', command=self.export_kml).pack(side='left', padx=4)
         ttk.Button(toolbar, text='导出MP4', command=self.export_mp4).pack(side='left', padx=4)
-
-        ttk.Separator(toolbar, orient='vertical').pack(side='left', fill='y', padx=8)
-
-        # 文件信息栏显隐切换
-        self.info_visible = tk.BooleanVar(value=True)
-        self.btn_toggle_info = ttk.Checkbutton(toolbar, text='文件信息', variable=self.info_visible,
-                                                 command=self._toggle_info_frame)
-        self.btn_toggle_info.pack(side='left', padx=4)
 
         # ---- 文件信息栏 ----
         self.info_frame = ttk.LabelFrame(main, text='文件信息', padding=8)
@@ -1312,7 +1310,7 @@ class MP5PlayerApp:
         """显示关于对话框"""
         about_text = """MP5录播器 — Windows版播放器
 
-版本: 1.0.20
+版本: 1.0.21
 作者: 大米斗（Aniseedaliao）
 
 MP5 = MP4 + Map
