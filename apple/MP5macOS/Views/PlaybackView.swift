@@ -6,12 +6,12 @@
 //
 // 对应 iOS版 PlaybackView，适配 macOS 大屏体验：
 //   - 使用 HSplitView / VSplitView 原生分屏（可拖拽调整比例）
-//   - 5种视图模式：仅视频、仅地图、左右分屏、上下分屏、画中画
+//   - 6种视图模式：仅视频、仅地图、左右分屏、上下分屏、画中画、路上景
 //   - 导出菜单（GPX / GeoJSON / KML / MP4）
 //   - 键盘快捷键（空格暂停/播放，左右箭头快进/快退）
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.21
+// 版本: 1.0.23
 //
 
 import SwiftUI
@@ -24,6 +24,7 @@ struct PlaybackView: View {
     let filePath: String
     @StateObject private var viewModel = PlaybackViewModel()
     @State private var showExportMenu = false
+    @State private var roadVideoPosition: CGPoint = .zero
 
     var body: some View {
         VStack(spacing: 0) {
@@ -79,6 +80,7 @@ struct PlaybackView: View {
                 viewModeButton(.splitLR, icon: "rectangle.split.2x1", label: "左右分屏")
                 viewModeButton(.splitTB, icon: "rectangle.split.2x1.slash", label: "上下分屏")
                 viewModeButton(.pip, icon: "pip.fill", label: "画中画")
+                viewModeButton(.road, icon: "location.circle.fill", label: "路上景")
             }
 
             Spacer()
@@ -175,6 +177,40 @@ struct PlaybackView: View {
                 )
                 .padding(12)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            }
+
+        case .road:
+            GeometryReader { geo in
+                ZStack {
+                    Mp5MapView(
+                        gpsSamples: viewModel.gpsSamples,
+                        currentGps: viewModel.currentGps,
+                        onMapClick: { lat, lon in viewModel.seekToGps(lat: lat, lon: lon) },
+                        onGpsScreenPosition: { point in
+                            let vw: CGFloat = 240
+                            let vh: CGFloat = 160
+                            let gap: CGFloat = 14
+                            var pos = point
+                            pos.y -= vh / 2 + gap
+                            if pos.y < vh / 2 {
+                                pos.y = point.y + vh / 2 + gap
+                            }
+                            pos.x = max(vw / 2, min(pos.x, geo.size.width - vw / 2))
+                            pos.y = max(vh / 2, min(pos.y, geo.size.height - vh / 2))
+                            roadVideoPosition = pos
+                        }
+                    )
+
+                    VideoPlayerView(viewModel: viewModel)
+                        .frame(width: 240, height: 160)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(.blue, lineWidth: 2)
+                        )
+                        .shadow(radius: 8)
+                        .position(roadVideoPosition)
+                }
             }
         }
     }

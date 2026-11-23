@@ -1,19 +1,24 @@
 package com.daliao.mp5.ui.playback
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PictureInPicture
@@ -35,8 +40,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daliao.mp5.data.Mp5Database
@@ -49,7 +57,7 @@ import androidx.compose.ui.viewinterop.AndroidView
  *
  * @author 大米斗（Aniseedaliao）
  */
-enum class ViewMode { VIDEO_ONLY, MAP_ONLY, SPLIT_LR, SPLIT_TB, PIP }
+enum class ViewMode { VIDEO_ONLY, MAP_ONLY, SPLIT_LR, SPLIT_TB, PIP, ROAD }
 
 /**
  * 播放界面 — 视频播放 + GPS地图同步
@@ -65,6 +73,7 @@ fun PlaybackScreen(
     var controller by remember { mutableStateOf<com.daliao.mp5.playback.Mp5PlayerController?>(null) }
     var filePath by remember { mutableStateOf<String?>(null) }
     var viewMode by remember { mutableStateOf(ViewMode.SPLIT_LR) }
+    var roadVideoOffset by remember { mutableStateOf(Offset.Zero) }
 
     // 从数据库加载文件信息
     LaunchedEffect(fileId) {
@@ -91,6 +100,7 @@ fun PlaybackScreen(
                 2 -> ViewMode.SPLIT_LR
                 3 -> ViewMode.SPLIT_TB
                 4 -> ViewMode.PIP
+                5 -> ViewMode.ROAD
                 else -> ViewMode.SPLIT_LR
             }
         }
@@ -146,6 +156,10 @@ fun PlaybackScreen(
                 }
             }) {
                 Icon(Icons.Filled.PictureInPicture, "分屏", tint = Color.White)
+            }
+            // 路上景按钮
+            IconButton(onClick = { viewMode = ViewMode.ROAD }) {
+                Icon(Icons.Filled.LocationOn, "路上景", tint = if (viewMode == ViewMode.ROAD) MaterialTheme.colorScheme.primary else Color.White)
             }
         }
 
@@ -209,6 +223,50 @@ fun PlaybackScreen(
                                 onMapClick = { lat, lon -> rec.seekToGps(lat, lon) },
                                 modifier = Modifier.fillMaxSize()
                             )
+                        }
+                    }
+                }
+                ViewMode.ROAD -> {
+                    val density = LocalDensity.current
+                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                        val containerWpx = with(density) { maxWidth.toPx() }
+                        val containerHpx = with(density) { maxHeight.toPx() }
+                        val videoW = with(density) { 160.dp.toPx() }
+                        val videoH = with(density) { 120.dp.toPx() }
+                        val gap = with(density) { 12.dp.toPx() }
+
+                        // 地图全屏
+                        Mp5MapView(
+                            gpsSamples = gpsSamples,
+                            currentGps = currentGps,
+                            onMapClick = { lat, lon -> rec.seekToGps(lat, lon) },
+                            modifier = Modifier.fillMaxSize(),
+                            onGpsScreenPosition = { offset ->
+                                roadVideoOffset = offset
+                            }
+                        )
+
+                        // 视频浮动小窗定位在 GPS 点上方
+                        var posX = roadVideoOffset.x - videoW / 2f
+                        var posY = roadVideoOffset.y - videoH - gap
+                        if (posY < 4f) {
+                            posY = roadVideoOffset.y + gap
+                        }
+                        posX = posX.coerceIn(4f, (containerWpx - videoW - 4f).coerceAtLeast(4f))
+                        posY = posY.coerceIn(4f, (containerHpx - videoH - 4f).coerceAtLeast(4f))
+
+                        Box(
+                            modifier = Modifier
+                                .width(160.dp)
+                                .height(120.dp)
+                                .offset(
+                                    x = with(density) { posX.toDp() },
+                                    y = with(density) { posY.toDp() }
+                                )
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(2.dp, Color(0xFF58A6FF), RoundedCornerShape(8.dp))
+                        ) {
+                            VideoPlayerView(rec)
                         }
                     }
                 }

@@ -81,6 +81,7 @@
                     <button class="btn btn-view" data-view="video">仅视频</button>
                     <button class="btn btn-view" data-view="map">仅地图</button>
                     <button class="btn btn-view" data-view="pip">画中画</button>
+                    <button class="btn btn-view" data-view="road">路上景</button>
                 </div>
                 <div class="export-bar">
                     <button class="btn btn-export" data-format="mp4">导出MP4</button>
@@ -155,6 +156,7 @@
                         <option value="2" selected>分屏(左右)</option>
                         <option value="3">分屏(上下)</option>
                         <option value="4">画中画</option>
+                        <option value="5">路上景</option>
                     </select>
                 </div>
                 <div class="setting-row">
@@ -198,13 +200,13 @@
     <div class="toast" id="toast" style="display:none;"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="js/mp5-box.js"></script>
-    <script src="js/mp5-parser.js"></script>
-    <script src="js/mp5-muxer.js"></script>
-    <script src="js/sync-engine.js"></script>
-    <script src="js/recorder.js"></script>
-    <script src="js/player.js"></script>
-    <script src="js/file-manager.js"></script>
-    <script src="js/app.js"></script>
+    <script type="module" src="js/mp5-box.js"></script>
+    <script type="module" src="js/mp5-parser.js"></script>
+    <script type="module" src="js/mp5-muxer.js"></script>
+    <script type="module" src="js/sync-engine.js"></script>
+    <script type="module" src="js/recorder.js"></script>
+    <script type="module" src="js/player.js"></script>
+    <script type="module" src="js/file-manager.js"></script>
+    <script type="module" src="js/app.js"></script>
 </body>
 </html>

@@ -5,10 +5,10 @@
 // 播放界面 — 视频播放 + GPS地图同步
 //
 // 对应 Android版 PlaybackScreen。
-// 使用 AVPlayer 视频播放 + MapKit 地图渲染，5种视图模式。
+// 使用 AVPlayer 视频播放 + MapKit 地图渲染，6种视图模式。
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.21
+// 版本: 1.0.23
 //
 
 import SwiftUI
@@ -20,6 +20,7 @@ struct PlaybackView: View {
     let filePath: String
     @StateObject private var viewModel = PlaybackViewModel()
     @Environment(\.dismiss) private var dismiss
+    @State private var roadVideoPosition: CGPoint = .zero
 
     var body: some View {
         NavigationStack {
@@ -76,6 +77,7 @@ struct PlaybackView: View {
                 viewModeButton(.mapOnly, icon: "map.fill")
                 viewModeButton(.splitLR, icon: "rectangle.split.2x1")
                 viewModeButton(.pip, icon: "pip.fill")
+                viewModeButton(.road, icon: "location.circle.fill")
             }
         }
         .padding(.horizontal)
@@ -149,6 +151,40 @@ struct PlaybackView: View {
                 )
                 .padding(8)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            }
+
+        case .road:
+            GeometryReader { geo in
+                ZStack {
+                    Mp5MapView(
+                        gpsSamples: viewModel.gpsSamples,
+                        currentGps: viewModel.currentGps,
+                        onMapClick: { lat, lon in viewModel.seekToGps(lat: lat, lon: lon) },
+                        onGpsScreenPosition: { point in
+                            let vw: CGFloat = 160
+                            let vh: CGFloat = 120
+                            let gap: CGFloat = 12
+                            var pos = point
+                            pos.y -= vh / 2 + gap
+                            if pos.y < vh / 2 {
+                                pos.y = point.y + vh / 2 + gap
+                            }
+                            pos.x = max(vw / 2, min(pos.x, geo.size.width - vw / 2))
+                            pos.y = max(vh / 2, min(pos.y, geo.size.height - vh / 2))
+                            roadVideoPosition = pos
+                        }
+                    )
+
+                    VideoPlayerView(viewModel: viewModel)
+                        .frame(width: 160, height: 120)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(.blue, lineWidth: 2)
+                        )
+                        .shadow(radius: 6)
+                        .position(roadVideoPosition)
+                }
             }
         }
     }

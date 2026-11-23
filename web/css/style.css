@@ -395,6 +395,52 @@ body {
     overflow: hidden;
 }
 
+/* 路上景：地图全屏，视频浮动在 GPS 位置上 */
+.player-main.view-road .map-pane {
+    flex: 1;
+}
+
+.player-main.view-road .video-pane {
+    position: absolute;
+    width: 240px;
+    height: 160px;
+    border-radius: 10px;
+    border: 2px solid #58a6ff;
+    z-index: 500;
+    flex: none;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+    overflow: visible;
+    pointer-events: auto;
+    background: #000;
+}
+
+/* 指向 GPS 点的小箭头（默认在视频下方） */
+.player-main.view-road .video-pane::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 10px solid #58a6ff;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));
+}
+
+/* 当视频窗在 GPS 点下方时，箭头朝上 */
+.player-main.view-road .video-pane.road-below::after {
+    bottom: auto;
+    top: -10px;
+    border-top: none;
+    border-bottom: 10px solid #58a6ff;
+}
+
+.player-main.view-road #player-video {
+    border-radius: 8px;
+}
+
 .player-controls {
     display: flex;
     justify-content: space-between;
@@ -577,6 +623,11 @@ body {
     .player-main.view-pip .map-pane {
         width: 120px;
         height: 120px;
+    }
+
+    .player-main.view-road .video-pane {
+        width: 160px;
+        height: 110px;
     }
 
     .record-controls {

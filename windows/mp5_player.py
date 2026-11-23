@@ -92,6 +92,7 @@ class MapCanvas(ttk.Frame):
         self.played_polyline = None
         self.speed_segments = []
         self.dragging = False  # 画中画拖拽模式标志
+        self.on_redraw_callback = None  # 路上景重绘回调
 
         # 绑定事件
         self.canvas.bind('<Button-1>', self._on_click)
@@ -126,6 +127,12 @@ class MapCanvas(ttk.Frame):
             self.current_pos_idx = len(self.gps_entries) - 1
 
         self._redraw()
+
+    def get_current_screen_pos(self):
+        """返回当前 GPS 位置在 Canvas 上的屏幕坐标 (x, y)"""
+        if 0 <= self.current_pos_idx < len(self.track_points):
+            return self.track_points[self.current_pos_idx]
+        return None
 
     def _on_click(self, event):
         """地图点击事件"""
@@ -249,6 +256,10 @@ class MapCanvas(ttk.Frame):
             self.canvas.create_text(w-82, legend_y+5, text=label, fill='#d0d7de', anchor='w', font=('Arial', 7))
             legend_y += 14
 
+        # 通知路上景：地图已重绘，需重新定位视频小窗
+        if self.on_redraw_callback:
+            self.on_redraw_callback()
+
 
 # ============================================================
 # 主应用窗口
@@ -320,7 +331,7 @@ class MP5PlayerApp:
         ttk.Label(toolbar, text='视图:').pack(side='left', padx=4)
         self.view_var = tk.StringVar(value='分屏')
         view_combo = ttk.Combobox(toolbar, textvariable=self.view_var, width=10,
-                                  values=['仅视频', '仅地图', '分屏', '画中画'], state='readonly')
+                                  values=['仅视频', '仅地图', '分屏', '画中画', '路上景'], state='readonly')
         view_combo.pack(side='left', padx=4)
         view_combo.bind('<<ComboboxSelected>>', self.switch_view)
 
@@ -440,9 +451,11 @@ class MP5PlayerApp:
         # 清除现有布局
         self.paned.pack_forget()
         self.video_frame.pack_forget()
+        self.video_frame.place_forget()  # 清除路上景的 place 布局
         self.map_frame.pack_forget()
         self.map_frame.place_forget()  # 清除画中画的 place 布局
         self.map_canvas.dragging = False  # 退出画中画拖拽模式
+        self.map_canvas.on_redraw_callback = None  # 清除路上景回调
         # 从 PanedWindow 中移除子组件（如果之前添加过）
         try:
             self.paned.forget(self.video_frame)
@@ -465,6 +478,13 @@ class MP5PlayerApp:
                                  x=-10, y=-10, width=280, height=210,
                                  anchor='se', bordermode='outside')
             self._setup_pip_drag()
+        elif view == '路上景':
+            # 路上景：地图占满整个区域，视频用 place 浮在 GPS 位置上
+            self.map_frame.pack(in_=self.content, fill='both', expand=True)
+            self.video_frame.place(in_=self.content, x=4, y=4,
+                                   width=280, height=200, anchor='nw', bordermode='inside')
+            self.map_canvas.on_redraw_callback = self._update_road_video_position
+            self._update_road_video_position()
         else:  # 分屏 — 使用 PanedWindow，可拖拽分隔条调整宽度
             self.paned.pack(in_=self.content, fill='both', expand=True)
             self.paned.add(self.video_frame, weight=1)
@@ -559,6 +579,7 @@ class MP5PlayerApp:
         view_menu.add_command(label='仅地图', command=lambda: self._set_view('仅地图'))
         view_menu.add_command(label='分屏', command=lambda: self._set_view('分屏'))
         view_menu.add_command(label='画中画', command=lambda: self._set_view('画中画'))
+        view_menu.add_command(label='路上景', command=lambda: self._set_view('路上景'))
         menubar.add_cascade(label='视图', menu=view_menu)
 
         help_menu = tk.Menu(menubar, tearoff=0)
@@ -1198,6 +1219,42 @@ class MP5PlayerApp:
         self._apply_view_layout()
         self.map_canvas._redraw()
 
+    def _update_road_video_position(self):
+        """路上景：将视频小窗定位到当前 GPS 点对应的地图位置"""
+        if self.current_view != '路上景':
+            return
+        pos = self.map_canvas.get_current_screen_pos()
+        if pos is None:
+            return
+
+        # 将 Canvas 内坐标转换为 content 内坐标
+        canvas_root_x = self.map_canvas.canvas.winfo_rootx()
+        canvas_root_y = self.map_canvas.canvas.winfo_rooty()
+        content_root_x = self.content.winfo_rootx()
+        content_root_y = self.content.winfo_rooty()
+        offset_x = canvas_root_x - content_root_x
+        offset_y = canvas_root_y - content_root_y
+
+        abs_x = offset_x + pos[0]
+        abs_y = offset_y + pos[1]
+
+        vw, vh = 280, 200
+        gap = 14
+        # 视频窗居中在 GPS 点上方
+        place_x = abs_x - vw // 2
+        place_y = abs_y - vh - gap
+        if place_y < 4:
+            place_y = abs_y + gap
+
+        # 边界限制
+        cw = self.content.winfo_width()
+        ch = self.content.winfo_height()
+        place_x = max(4, min(place_x, cw - vw - 4))
+        place_y = max(4, min(place_y, ch - vh - 4))
+
+        self.video_frame.place_configure(x=place_x, y=place_y, width=vw, height=vh,
+                                         anchor='nw', bordermode='inside')
+
     # ============================================================
     # 导出
     # ============================================================
@@ -1310,7 +1367,7 @@ class MP5PlayerApp:
         """显示关于对话框"""
         about_text = """MP5录播器 — Windows版播放器
 
-版本: 1.0.21
+版本: 1.0.23
 作者: 大米斗（Aniseedaliao）
 
 MP5 = MP4 + Map

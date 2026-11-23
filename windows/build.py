@@ -15,7 +15,7 @@ MP5录播器 — 跨平台构建脚本
   python build.py --clean      # 清理后构建
 
 作者: 大米斗（Aniseedaliao）
-版本: 1.0.21
+版本: 1.0.23
 """
 
 import os

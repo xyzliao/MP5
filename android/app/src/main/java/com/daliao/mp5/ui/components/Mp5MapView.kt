@@ -8,12 +8,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.daliao.mp5.format.GpsSample
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.events.MapListener
+import org.osmdroid.events.ScrollEvent
+import org.osmdroid.events.ZoomEvent
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Polyline
@@ -35,15 +41,32 @@ fun Mp5MapView(
     gpsSamples: List<GpsSample>,
     currentGps: Pair<Double, Double>?,
     onMapClick: (Double, Double) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onGpsScreenPosition: ((Offset) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val mapView = remember { MapView(context) }
+    val callbackRef = remember { mutableStateOf<((Offset) -> Unit)?>(null) }
+    val lastGpsRef = remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    callbackRef.value = onGpsScreenPosition
 
     DisposableEffect(Unit) {
         mapView.setTileSource(TileSourceFactory.MAPNIK)
         mapView.setMultiTouchControls(true)
         mapView.controller.setZoom(15.0)
+
+        // 地图平移/缩放监听 — 路上景重新定位视频小窗
+        val mapListener = object : MapListener {
+            override fun onScroll(event: ScrollEvent?): Boolean {
+                reportGpsScreenPosition(mapView, lastGpsRef.value, callbackRef.value)
+                return false
+            }
+            override fun onZoom(event: ZoomEvent?): Boolean {
+                reportGpsScreenPosition(mapView, lastGpsRef.value, callbackRef.value)
+                return false
+            }
+        }
+        mapView.addMapListener(mapListener)
 
         onDispose {
             // osmdroid需要清理资源
@@ -106,9 +129,12 @@ fun Mp5MapView(
     // 更新当前位置标记
     LaunchedEffect(currentGps) {
         if (currentGps != null) {
+            lastGpsRef.value = currentGps
             // 移除旧的位置标记并添加新的
             // 简化版：直接设置地图中心
             mapView.controller.animateTo(GeoPoint(currentGps.first, currentGps.second))
+            // 路上景：报告当前 GPS 点的屏幕坐标
+            reportGpsScreenPosition(mapView, currentGps, callbackRef.value)
         }
     }
 
@@ -137,4 +163,17 @@ private fun addMarker(mapView: MapView, point: GeoPoint, title: String, color: I
         setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
     }
     mapView.overlays.add(marker)
+}
+
+/** 将 GPS 坐标转换为地图屏幕像素坐标并回调（路上景用） */
+private fun reportGpsScreenPosition(
+    mapView: MapView,
+    gps: Pair<Double, Double>?,
+    callback: ((Offset) -> Unit)?
+) {
+    if (gps == null || callback == null) return
+    val point = mapView.projection.toPixels(GeoPoint(gps.first, gps.second), null)
+    if (point != null) {
+        callback(Offset(point.x.toFloat(), point.y.toFloat()))
+    }
 }

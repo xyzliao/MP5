@@ -14,8 +14,8 @@ android {
         applicationId = "com.daliao.mp5"
         minSdk = 26
         targetSdk = 34
-        versionCode = 10
-        versionName = "1.0.21"
+        versionCode = 12
+        versionName = "1.0.23"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

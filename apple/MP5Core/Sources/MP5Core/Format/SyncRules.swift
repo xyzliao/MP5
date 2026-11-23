@@ -9,7 +9,7 @@
 //           map_style(1B) + show_trajectory(1B) + show_poi(1B) + default_view(1B) = 14 bytes
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.21
+// 版本: 1.0.23
 //
 
 import Foundation
@@ -43,6 +43,7 @@ public enum ViewMode: Int, Codable, CaseIterable, Sendable {
     case splitLR = 2      // 分屏左右
     case splitTB = 3      // 分屏上下
     case pip = 4         // 画中画
+    case road = 5        // 路上景（地图全屏，视频浮在GPS位置上）
 }
 
 /// gsyn Box 同步规则
@@ -50,7 +51,7 @@ public struct SyncRules: Codable, Sendable {
     public var syncMode: Int       // 0=时间同步, 1=最近邻, 2=插值
     public var syncOffsetMs: Int   // 同步偏移量(毫秒)
     public var interpolation: Int // 0=最近邻, 1=线性, 2=三次样条
-    public var defaultView: Int   // 0=仅视频, 1=仅地图, 2=分屏左右, 3=分屏上下, 4=画中画
+    public var defaultView: Int   // 0=仅视频, 1=仅地图, 2=分屏左右, 3=分屏上下, 4=画中画, 5=路上景
     public var videoRatio: Float  // 分屏视频占比
     public var mapStyle: Int      // 0=标准, 1=卫星, 2=地形, 3=暗色
     public var showTrajectory: Bool

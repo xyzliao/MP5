@@ -16,7 +16,7 @@
 // 与 Windows版 mux_mp5() 和 Android版 Mp5Muxer 完全对齐。
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.21
+// 版本: 1.0.23
 //
 
 import Foundation

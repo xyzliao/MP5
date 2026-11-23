@@ -6,7 +6,7 @@
  * 2. 播放视频
  * 3. 渲染地图和 GPS 轨迹
  * 4. 视频↔地图双向联动
- * 5. 视图切换（分屏/仅视频/仅地图/画中画）
+ * 5. 视图切换（分屏/仅视频/仅地图/画中画/路上景）
  * 6. 速度热力图
  * 7. POI 标记显示
  */
@@ -98,7 +98,7 @@ export class Player {
 
             // 应用默认视图
             if (syncConfig.defaultView !== undefined) {
-                const viewMap = { 0: 'video', 1: 'map', 2: 'split', 3: 'split-v', 4: 'pip' };
+                const viewMap = { 0: 'video', 1: 'map', 2: 'split', 3: 'split-v', 4: 'pip', 5: 'road' };
                 this.setView(viewMap[syncConfig.defaultView] || 'split');
             }
         }
@@ -106,9 +106,13 @@ export class Player {
 
     /**
      * 切换视图模式
-     * @param {string} view - 视图模式: video/map/split/split-v/pip
+     * @param {string} view - 视图模式: video/map/split/split-v/pip/road
      */
     setView(view) {
+        // 离开路上景时清理
+        if (this.currentView === 'road' && view !== 'road') {
+            this._cleanupRoadView();
+        }
         this.currentView = view;
         const main = document.getElementById('player-main');
 
@@ -132,6 +136,10 @@ export class Player {
                 main.classList.add('view-pip');
                 this._setupPipDrag(main);
                 break;
+            case 'road':
+                main.classList.add('view-road');
+                this._setupRoadView();
+                break;
         }
 
         // 通知地图更新尺寸
@@ -145,6 +153,92 @@ export class Player {
         document.querySelectorAll('.btn-view').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.view === view);
         });
+    }
+
+    /**
+     * 设置路上景：视频小窗跟随 GPS 位置
+     */
+    _setupRoadView() {
+        if (!this.mapManager) return;
+
+        // 注册位置更新回调：视频播放时 GPS 位置变化 → 重新定位视频小窗
+        this.mapManager.onPositionUpdate((lat, lon) => {
+            this._updateRoadVideoPosition(lat, lon);
+        });
+
+        // 地图平移/缩放时重新定位
+        this._roadMapHandler = () => {
+            if (this.currentView !== 'road') return;
+            if (this.mapManager && this.mapManager.currentMarker) {
+                const ll = this.mapManager.currentMarker.getLatLng();
+                this._updateRoadVideoPosition(ll.lat, ll.lng);
+            }
+        };
+        this.mapManager.map.on('move zoom', this._roadMapHandler);
+
+        // 初始定位
+        if (this.mapManager.currentMarker) {
+            const ll = this.mapManager.currentMarker.getLatLng();
+            setTimeout(() => this._updateRoadVideoPosition(ll.lat, ll.lng), 100);
+        }
+    }
+
+    /**
+     * 清理路上景
+     */
+    _cleanupRoadView() {
+        if (this.mapManager) {
+            this.mapManager.onPositionUpdate(null);
+            if (this._roadMapHandler) {
+                this.mapManager.map.off('move zoom', this._roadMapHandler);
+                this._roadMapHandler = null;
+            }
+        }
+        const videoPane = document.getElementById('video-pane');
+        if (videoPane) {
+            videoPane.style.left = '';
+            videoPane.style.top = '';
+            videoPane.classList.remove('road-below');
+        }
+    }
+
+    /**
+     * 更新路上景视频小窗在地图上的位置
+     * @param {number} lat - 纬度
+     * @param {number} lon - 经度
+     */
+    _updateRoadVideoPosition(lat, lon) {
+        if (this.currentView !== 'road') return;
+        if (!this.mapManager || !this.mapManager.map) return;
+
+        const videoPane = document.getElementById('video-pane');
+        if (!videoPane) return;
+
+        // GPS 坐标 → 地图容器像素坐标
+        const point = this.mapManager.map.latLngToContainerPoint([lat, lon]);
+        const vw = videoPane.offsetWidth;
+        const vh = videoPane.offsetHeight;
+        const container = this.mapManager.container;
+        const cw = container.offsetWidth;
+        const ch = container.offsetHeight;
+
+        let x = point.x - vw / 2;
+        let y = point.y - vh - 14; // 14px 留给指向箭头
+
+        // 靠近顶部时，视频窗放到 GPS 点下方
+        if (y < 4) {
+            y = point.y + 14;
+            videoPane.classList.add('road-below');
+        } else {
+            videoPane.classList.remove('road-below');
+        }
+
+        // 水平/垂直边界限制
+        x = Math.max(4, Math.min(x, cw - vw - 4));
+        y = Math.max(4, Math.min(y, ch - vh - 4));
+
+        videoPane.style.left = x + 'px';
+        videoPane.style.top = y + 'px';
     }
 
     /**
@@ -265,6 +359,7 @@ export class Player {
      * 销毁播放器
      */
     destroy() {
+        this._cleanupRoadView();
         if (this.videoBlobUrl) {
             URL.revokeObjectURL(this.videoBlobUrl);
             this.videoBlobUrl = null;
@@ -311,6 +406,7 @@ export class MapManager {
         this.endMarker = null;
         this.poiMarkers = [];
         this.clickCallback = null;
+        this.positionUpdateCallback = null;
 
         // 地图点击事件
         this.map.on('click', (e) => {
@@ -423,6 +519,11 @@ export class MapManager {
             }
             this.playedTrackLine.setLatLngs(playedPoints);
         }
+
+        // 通知路上景：位置已更新
+        if (this.positionUpdateCallback) {
+            this.positionUpdateCallback(lat, lon);
+        }
     }
 
     /**
@@ -491,6 +592,14 @@ export class MapManager {
     }
 
     /**
+     * 注册位置更新回调（路上景用）
+     * 当 currentMarker 位置变化时调用
+     */
+    onPositionUpdate(callback) {
+        this.positionUpdateCallback = callback;
+    }
+
+    /**
      * 刷新地图尺寸
      */
     invalidateSize() {
@@ -503,6 +612,7 @@ export class MapManager {
      * 销毁地图
      */
     destroy() {
+        this.positionUpdateCallback = null;
         if (this.map) {
             this.map.remove();
             this.map = null;

@@ -17,7 +17,7 @@
 //   - 自动调整视野范围
 //
 // 作者: 大米斗（Aniseedaliao）
-// 版本: 1.0.21
+// 版本: 1.0.23
 //
 
 import SwiftUI
@@ -28,6 +28,7 @@ struct Mp5MapView: UIViewRepresentable {
     let gpsSamples: [GpsSample]
     let currentGps: (Double, Double)?
     let onMapClick: (Double, Double) -> Void
+    var onGpsScreenPosition: ((CGPoint) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onMapClick: onMapClick)
@@ -49,6 +50,7 @@ struct Mp5MapView: UIViewRepresentable {
 
     func updateUIView(_ mapView: MKMapView, context: Context) {
         context.coordinator.onMapClick = onMapClick
+        context.coordinator.onGpsScreenPosition = onGpsScreenPosition
 
         // 更新轨迹
         if gpsSamples != context.coordinator.lastSamples {
@@ -144,6 +146,7 @@ struct Mp5MapView: UIViewRepresentable {
 extension Mp5MapView {
     class Coordinator: NSObject, MKMapViewDelegate {
         var onMapClick: (Double, Double) -> Void
+        var onGpsScreenPosition: ((CGPoint) -> Void)?
         var lastSamples: [GpsSample] = []
         private var currentAnnotation: MKPointAnnotation?
 
@@ -167,6 +170,20 @@ extension Mp5MapView {
             annotation.title = "当前位置"
             currentAnnotation = annotation
             mapView.addAnnotation(annotation)
+
+            // 路上景：报告当前 GPS 点的屏幕坐标
+            if let callback = onGpsScreenPosition {
+                let point = mapView.convert(coordinate, toPointTo: mapView)
+                callback(point)
+            }
+        }
+
+        // 地图区域变化时（平移/缩放）重新计算 GPS 点屏幕坐标
+        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            if let callback = onGpsScreenPosition, let coord = currentAnnotation?.coordinate {
+                let point = mapView.convert(coord, toPointTo: mapView)
+                callback(point)
+            }
         }
 
         // MARK: - MKMapViewDelegate
