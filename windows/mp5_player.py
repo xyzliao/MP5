@@ -483,6 +483,7 @@ class MP5PlayerApp:
             self.map_frame.pack(in_=self.content, fill='both', expand=True)
             self.video_frame.place(in_=self.content, x=4, y=4,
                                    width=280, height=200, anchor='nw', bordermode='inside')
+            self.video_frame.lift()  # 确保视频浮窗在地图之上
             self.map_canvas.on_redraw_callback = self._update_road_video_position
             self._update_road_video_position()
         else:  # 分屏 — 使用 PanedWindow，可拖拽分隔条调整宽度
@@ -1223,8 +1224,21 @@ class MP5PlayerApp:
         """路上景：将视频小窗定位到当前 GPS 点对应的地图位置"""
         if self.current_view != '路上景':
             return
+
+        vw, vh = 280, 200
+        cw = self.content.winfo_width()
+        ch = self.content.winfo_height()
+        if cw < 10 or ch < 10:
+            return
+
         pos = self.map_canvas.get_current_screen_pos()
         if pos is None:
+            # 无 GPS 数据时，视频窗固定在右下角
+            place_x = max(4, cw - vw - 10)
+            place_y = max(4, ch - vh - 10)
+            self.video_frame.place_configure(x=place_x, y=place_y, width=vw, height=vh,
+                                             anchor='nw', bordermode='inside')
+            self.video_frame.lift()
             return
 
         # 将 Canvas 内坐标转换为 content 内坐标
@@ -1238,7 +1252,6 @@ class MP5PlayerApp:
         abs_x = offset_x + pos[0]
         abs_y = offset_y + pos[1]
 
-        vw, vh = 280, 200
         gap = 14
         # 视频窗居中在 GPS 点上方
         place_x = abs_x - vw // 2
@@ -1247,13 +1260,12 @@ class MP5PlayerApp:
             place_y = abs_y + gap
 
         # 边界限制
-        cw = self.content.winfo_width()
-        ch = self.content.winfo_height()
         place_x = max(4, min(place_x, cw - vw - 4))
         place_y = max(4, min(place_y, ch - vh - 4))
 
         self.video_frame.place_configure(x=place_x, y=place_y, width=vw, height=vh,
                                          anchor='nw', bordermode='inside')
+        self.video_frame.lift()  # 确保始终在地图之上
 
     # ============================================================
     # 导出
