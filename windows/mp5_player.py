@@ -477,6 +477,7 @@ class MP5PlayerApp:
             self.map_frame.place(in_=self.content, relx=1.0, rely=1.0,
                                  x=-10, y=-10, width=280, height=210,
                                  anchor='se', bordermode='outside')
+            self.map_frame.lift()  # 确保地图浮窗在视频之上
             self._setup_pip_drag()
         elif view == '路上景':
             # 路上景：地图占满整个区域，视频用 place 浮在 GPS 位置上
@@ -544,6 +545,7 @@ class MP5PlayerApp:
             rel_y = new_y - cy
             self.map_frame.place_configure(x=rel_x, y=rel_y, relx=0, rely=0,
                                            anchor='nw', bordermode='inside')
+            self.map_frame.lift()
             self.map_canvas._redraw()
 
         def on_release(event):
